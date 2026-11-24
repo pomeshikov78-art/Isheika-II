@@ -13,3 +13,12 @@ var/boot-log.json
 var/journal-fallback.log
 var/files/
 var/backups/
+
+# Секреты и локальная конфигурация рабочего каталога — не публикуются никогда:
+# мастер-ключ хранилища и зашифрованные ключи источников, локальный config.json,
+# служебные файлы WAL рядом с демонстрационной БД.
+var/secrets.enc
+var/secrets.enc.master
+var/config.json
+var/isheika.db-shm
+var/isheika.db-wal
