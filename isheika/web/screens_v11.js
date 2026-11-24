@@ -52,7 +52,7 @@ window.Screens = window.Screens || {};
       if (detail) {
         const weights = (detail.parameters || {}).weights || {};
         const factors = (detail.parameters || {}).factors || [];
-        document.getElementById('m-detail').innerHTML = `
+        App.setHTML('m-detail', `
           ${App.card('Методика ' + esc(detail.code) + ' ' + esc(detail.version), `
             ${App.kv({'Формула': esc((detail.formula_definition || {}).expression || '—'),
                       'Нормативный источник': esc((detail.formula_definition || {}).normative_source || '—'),
@@ -72,7 +72,7 @@ window.Screens = window.Screens || {};
           ${App.card('История версий', `<table class="tbl"><tr><th>Код</th><th>Версия</th><th>Статус</th><th>Активна</th><th>Дата</th><th>Изменение</th></tr>
             ${(detail.history || []).map(h => `<tr><td>${esc(h.code)}</td><td>${esc(h.version)}</td>
               <td>${App.statusTag(h.approval_status)}</td><td>${h.is_active ? '✓' : '—'}</td>
-              <td>${esc(App.donly(h.created_at))}</td><td class="tiny">${esc(h.change_description || '')}</td></tr>`).join('')}</table>`)}`;
+              <td>${esc(App.donly(h.created_at))}</td><td class="tiny">${esc(h.change_description || '')}</td></tr>`).join('')}</table>`)}`);
         document.getElementById('m-validate')?.addEventListener('click', async () => {
           try {
             await App.post(`/api/v1/methodologies/${detail.id}/approval`, {approval_status: 'VALIDATED'});

@@ -177,7 +177,7 @@ window.Screens = window.Screens || {};
         const showSample = f => {
           const g = rows.find(x => x.fingerprint === f) || {};
           const s = g.sample || {};
-          document.getElementById('je-detail').innerHTML = App.card('Последнее падение подписи ' + f, `
+          App.setHTML('je-detail', App.card('Последнее падение подписи ' + f, `
             ${App.kv({'Действие': esc(g.action || '—'), 'Код': esc(g.error_code || '—'),
                       'Повторов': g.occurrences ?? 0, 'Время': App.dt(s.at),
                       'Пользователь': esc(s.actor || '—'), 'request_id': `<code>${esc(s.request_id || '—')}</code>`,
@@ -185,7 +185,7 @@ window.Screens = window.Screens || {};
             ${App.alert('error', esc(s.message || ''))}
             ${s.stack ? `<pre class="boot-log">${esc(s.stack)}</pre>` : '<p class="tiny muted">Traceback не сохранён (ошибка предметная, а не программная).</p>'}
             <div class="row">${s.id ? `<button class="btn sm" data-jrn="${esc(s.id)}">Открыть запись</button>` : ''}
-              <a class="btn sm" href="#/journal?level=error&q=${encodeURIComponent(g.action || '')}">Все записи этого действия</a></div>`);
+              <a class="btn sm" href="#/journal?level=error&q=${encodeURIComponent(g.action || '')}">Все записи этого действия</a></div>`));
           wireRows(document.getElementById('je-detail'));
         };
         host.querySelectorAll('[data-fp]').forEach(a => a.addEventListener('click', ev => {

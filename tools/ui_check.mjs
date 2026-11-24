@@ -344,6 +344,32 @@ t('журнал: очередь дослана с отметкой queued_at', (
     ? true : 'доставленное событие с queued_at не найдено');
 t('журнал: очередь браузера очищена', () => App.journalQueueSize() === 0 || `осталось ${App.journalQueueSize()}`);
 
+// --- ред. 1.4.2: параллельные перерисовки и «слушатели-призраки»
+App.go('dashboard', {});
+App.render(); App.render(); App.render();          // как при входе: hashchange + afterLogin
+await sleep(2500);
+t('отрисовка: параллельные вызовы не ломают экран', () => {
+  const el = window.document.getElementById('d-quality');
+  return (el && el.innerHTML.length > 20) ? true : 'карточка качества пуста или отсутствует';
+});
+const errsBefore = errors.length;
+App.go('monitor', {});
+await sleep(2000);
+App.render();                                     // перерисовка без смены маршрута
+await sleep(2000);
+window.dispatchEvent(new window.CustomEvent('isheika:event', {detail: {
+  event_type: 'job.progress', created_at: new Date().toISOString(), severity: 'info',
+  payload: {stage: 'source_search', message: 'проверка ленты'}}}));
+await sleep(600);
+t('отрисовка: событие после перерисовки не даёт ошибки', () => {
+  const fresh = errors.slice(errsBefore).filter(e => !/navigation to another Document/.test(e));
+  return fresh.length === 0 ? true : fresh.slice(0, 2).join(' | ');
+});
+t('отрисовка: лента мониторинга на месте', () => {
+  const el = window.document.getElementById('m-events');
+  return (el && el.innerHTML.length > 20) ? true : 'лента событий отсутствует';
+});
+
 App.setTheme('dark');
 t('тёмная тема применяется', () => window.document.documentElement.dataset.theme === 'dark');
 App.setTheme('light');

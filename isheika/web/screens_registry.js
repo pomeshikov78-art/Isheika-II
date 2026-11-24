@@ -550,17 +550,20 @@ window.Screens = window.Screens || {};
         try { await App.post('/api/v1/connectors/check', {}); App.toast('Проверка завершена', 'ok'); App.render(); }
         catch (err) { App.toast(esc(err.message), 'error'); }
       });
-      const feed = document.getElementById('m-events');
       const hist = await App.get('/api/v1/events', {research_id: rid, limit: 25});
-      const render = items => feed.innerHTML = items.slice(0, 40).map(e => `<div class="evidence-item">
+      // Лента пишет через App.setHTML: узел ищется в момент записи, а не до
+      // ожидания запроса — иначе после смены экрана получаем null.innerHTML.
+      const render = items => App.setHTML('m-events', items.slice(0, 40).map(e => `<div class="evidence-item">
         <b>${esc(e.event_type)}</b> <span class="tiny muted">${App.dt(e.created_at)} · ${esc(e.severity)}</span>
-        <div class="tiny">${esc(App.short(JSON.stringify(e.payload || {}), 200))}</div></div>`).join('') || App.empty('Событий нет', '📡');
+        <div class="tiny">${esc(App.short(JSON.stringify(e.payload || {}), 200))}</div></div>`).join('') || App.empty('Событий нет', '📡'));
       let items = hist.items || [];
       render(items);
       const onEv = ev => { items.unshift(ev.detail); render(items); };
       window.addEventListener('isheika:event', onEv);
-      const stop = () => window.removeEventListener('isheika:event', onEv);
-      window.addEventListener('hashchange', stop, {once: true});
+      // Слушатель снимается при ЛЮБОЙ перерисовке, а не только при смене маршрута:
+      // иначе он переживал обновление экрана и писал в отсутствующий узел.
+      App.onCleanup(() => window.removeEventListener('isheika:event', onEv));
+      window.addEventListener('hashchange', () => window.removeEventListener('isheika:event', onEv), {once: true});
       App.ctxObject('Система', {'Профиль': esc(sys.profile), 'Методика': esc(sys.methodology_version),
         'Событий в журнале': sys.counters.events, 'Время сервера': App.dt(sys.server_time)});
     },

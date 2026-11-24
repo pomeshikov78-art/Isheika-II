@@ -79,10 +79,10 @@ window.Screens = window.Screens || {};
         onRow: r => App.go('document', {id: r.id}),
       });
       const q = d.quality || [];
-      document.getElementById('d-quality').innerHTML = q.length ? `<table class="tbl"><tr><th>Метрика</th><th>Значение</th><th>Выборка</th><th>Калибровка</th></tr>
+      App.setHTML('d-quality', q.length ? `<table class="tbl"><tr><th>Метрика</th><th>Значение</th><th>Выборка</th><th>Калибровка</th></tr>
         ${q.map(x => `<tr><td>${esc(x.metric)}</td><td class="num">${x.value == null ? '—' : App.num(x.value, 3)}</td><td class="num">${x.sample_size}</td>
         <td>${x.calibrated ? App.tag('подтверждена', 'ok') : App.tag('не завершена', 'warn')}</td></tr>`).join('')}</table>`
-        : App.empty('Метрики ещё не рассчитаны', '📏');
+        : App.empty('Метрики ещё не рассчитаны', '📏'));
       App.ctxObject('Система', {
         'Профиль': esc((App.S.system || {}).profile), 'Версия методики': esc((App.S.system || {}).methodology_version),
         'Коннекторов live': d.connectors_summary.live, 'Активных': d.connectors_summary.active,
@@ -336,7 +336,7 @@ window.Screens = window.Screens || {};
         try {
           const res = await App.post(`/api/v1/researches/${rid}/query`, {query: document.getElementById('q-text').value, languages: r.language_codes});
           App.toast('Создана новая версия запроса', 'ok');
-          document.getElementById('q-preview-box').innerHTML = previewHTML({parsed: res.parsed, expansion: res.expansion, expression: (res.expansion.branches || [{}])[0]?.expression, connectors: p.connectors});
+          App.setHTML('q-preview-box', previewHTML({parsed: res.parsed, expansion: res.expansion, expression: (res.expansion.branches || [{}])[0]?.expression, connectors: p.connectors}));
         } catch (e) { App.toast(esc(e.message), 'error'); }
       });
       document.getElementById('q-preview').addEventListener('click', async () => {
@@ -395,13 +395,13 @@ window.Screens = window.Screens || {};
               ${App.alert('info', 'Модель ИД-03: физическое содержимое (blob, SHA-256) → логический документ → вхождение в источнике → кластер связанных версий. Объединение не уничтожает сведения об источниках обнаружения.')}
               <div id="cl-box"></div>`;
             const items = cl.items || [];
-            document.getElementById('cl-box').innerHTML = items.length ? items.map(c => `
+            App.setHTML('cl-box', items.length ? items.map(c => `
               <div class="card"><h3>${esc(App.short(c.title || c.cluster_key, 90))} ${App.statusTag(c.cluster_type)}</h3>
                 <table class="tbl"><tr><th>Документ</th><th>Связь</th><th>Роль</th><th>Уверенность</th><th>Вхождения (источник · URL · дата)</th></tr>
                 ${(c.members || []).map(mm => `<tr><td><a href="#/document/${esc(mm.document_id)}">${esc(App.short(mm.title, 70))}</a></td>
                   <td>${App.statusTag(mm.relation)}</td><td>${esc(mm.role)}</td><td class="num">${App.num(mm.confidence, 2)}</td>
                   <td class="tiny">${(mm.occurrences || []).map(o => `${esc(o.source_code)} · <a href="${esc(o.url)}" target="_blank" rel="noopener">${esc(App.short(o.url, 48))}</a> · ${esc(App.donly(o.accessed_at))}`).join('<br>')}</td></tr>`).join('')}
-                </table></div>`).join('') : App.empty('Кластеры не сформированы: повторных размещений и версий не найдено', '🧬');
+                </table></div>`).join('') : App.empty('Кластеры не сформированы: повторных размещений и версий не найдено', '🧬'));
             return;
           }
           if (!rows.length) {
@@ -974,7 +974,7 @@ window.Screens = window.Screens || {};
           <span class="tiny muted">Выгрузка содержит дату, версии методик и моделей, параметры, источники и предупреждения.</span></div>`)}
         <div id="r-list">${(d.items || []).length ? '' : App.empty('Отчёты ещё не формировались', '📝')}</div>`;
       const paintReports = items => {
-        document.getElementById('r-list').innerHTML = items.map(r => App.card(
+        App.setHTML('r-list', items.map(r => App.card(
           esc(r.title) + ' · ' + App.dt(r.created_at), `
           ${App.kv({'Статус': App.statusTag(r.status), 'Методика': esc(r.methodology_version),
             'Хеш снимка': '<code>' + esc(String(r.snapshot_hash || '').slice(0, 16)) + '</code>',
@@ -983,7 +983,7 @@ window.Screens = window.Screens || {};
             ? `<button class="btn sm" disabled title="Файл отсутствует на диске — сформируйте отчёт заново">${esc(f.toUpperCase())} ⚠</button>`
             : `<a class="btn sm" href="${App.fileURL('/api/v1/reports/' + r.id + '/file', {fmt: f})}" target="_blank">${esc(f.toUpperCase())} ↗</a>`).join('')}</div>
           ${(r.missing_files || []).length ? App.alert('warn', 'Файлы отчёта отсутствуют на диске: ' + r.missing_files.map(f => esc(f.toUpperCase())).join(', ') + '. Запись отчёта сохранена, сами файлы — нет (перенос состояния или чистка каталога var/files). Нажмите «Сформировать отчёт», чтобы создать их заново.') : ''}
-          ${(r.warnings || []).length ? App.alert('warn', (r.warnings || []).map(esc).join('<br>')) : ''}`)).join('');
+          ${(r.warnings || []).length ? App.alert('warn', (r.warnings || []).map(esc).join('<br>')) : ''}`)).join(''));
       };
       paintReports(d.items || []);
       document.getElementById('r-gen')?.addEventListener('click', async () => {

@@ -58,11 +58,22 @@ def probe(component: str) -> dict:
             detail = f"migrations={row['c'] if row else 0}; quick_check={state}"
         elif component == "storage":
             SETTINGS.ensure_dirs()
-            path = os.path.join(SETTINGS.files_dir, ".slo-probe")
+            os.makedirs(SETTINGS.files_dir, exist_ok=True)
+            # Имя файла уникально для каждой пробы: планировщик, самопроверка
+            # загрузки и запрос API могут проверять хранилище одновременно.
+            # Общий файл `.slo-probe` удалялся чужой пробой, и Windows давал
+            # FileNotFoundError — ложный алерт COMPONENT_DOWN (журнал пользователя).
+            path = os.path.join(SETTINGS.files_dir, f".slo-probe-{new_id('p')[2:]}")
+            stamp = iso_now()
             with open(path, "w", encoding="utf-8") as f:
-                f.write(iso_now())
-            os.remove(path)
-            detail = "files_dir доступен на запись"
+                f.write(stamp)
+            with open(path, encoding="utf-8") as f:
+                ok = f.read() == stamp
+            try:
+                os.remove(path)
+            except FileNotFoundError:
+                pass                      # файл уже удалён извне — не отказ подсистемы
+            detail = "files_dir доступен на запись" if ok else "запись прочитана иначе, чем записана"
         elif component == "api":
             from .api.server import ROUTES          # поздний импорт: без цикла
             ok = len(ROUTES) > 0

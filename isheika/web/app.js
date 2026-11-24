@@ -610,8 +610,38 @@ const App = (() => {
   }
   function go(route, params) { location.hash = '#/' + route + qsOf(params); }
 
-  async function render() {
+  /* Перерисовки идут СТРОГО по очереди (ред. 1.4.2).
+     Раньше afterLogin менял location.hash (это вызывало render по hashchange) и
+     сам вызывал render: две отрисовки одного экрана шли параллельно, вторая
+     подменяла разметку, а первая писала в уже отсоединённый узел —
+     «Cannot set properties of null (setting 'innerHTML')» на UI-01 и UI-23
+     (журнал пользователя). Теперь запросы объединяются: выполняется последний. */
+  const RENDER = {seq: 0, chain: Promise.resolve(), cleanups: []};
+  function onCleanup(fn) { if (typeof fn === 'function') RENDER.cleanups.push(fn); }
+  function runCleanups() {
+    const list = RENDER.cleanups.splice(0, RENDER.cleanups.length);
+    list.forEach(fn => { try { fn(); } catch (e) { /* очистка не должна ронять экран */ } });
+  }
+  function render() {
+    const my = ++RENDER.seq;
+    RENDER.chain = RENDER.chain.then(() => (my === RENDER.seq ? drawScreen() : null))
+      .catch(e => { reportClient({action: 'render.chain', message: (e && e.message) || String(e),
+                                  stack: e && e.stack, type: 'RenderChainError'}); });
+    return RENDER.chain;
+  }
+
+  // Безопасная запись в узел: экран мог быть сменён, пока шёл запрос.
+  function setHTML(id, html) {
+    const el = typeof id === 'string' ? $(id) : id;
+    if (!el) return false;
+    el.innerHTML = html;
+    return true;
+  }
+  const stale = host => !host || host.isConnected === false;
+
+  async function drawScreen() {
     if (!S.user) return;
+    runCleanups();
     const {route, params} = parseHash();
     S.route = route; S.params = params;
     if (params.rid && params.rid !== S.researchId) { S.researchId = params.rid; store.set('isheika.rid', params.rid); }
@@ -628,8 +658,11 @@ const App = (() => {
     const body = $('screen-body');
     if (screen.right && !can(screen.right)) { body.innerHTML = denied(screen.right); return; }
     loading(body);
-    try { await screen.render(body, params); }
-    catch (e) {
+    try {
+      await screen.render(body, params);
+      if (stale(body)) return;                 // экран уже сменился — не трогаем DOM
+    } catch (e) {
+      if (stale(body)) return;                 // отказ устаревшей отрисовки не дефект
       fail(body, e, {stage: screen.ui});
       reportClient({action: 'render.' + route, message: (e && e.message) || String(e),
                     stack: e && e.stack, code: e && e.code, type: (e && e.name) || 'RenderError',
@@ -766,6 +799,7 @@ const App = (() => {
     go, render, refreshSystem, MENU, STATUS_RU, init, setTheme, logout, bootLogModal, reportClient,
     retry: () => { probeServer(); return render(); },
     flushJournal, journalQueueSize, probeServer, netState: NET,
+    setHTML, stale, onCleanup,
   };
 })();
 

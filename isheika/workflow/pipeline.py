@@ -40,6 +40,67 @@ def _profile(research: dict) -> dict:
     return prof
 
 
+def _parsed_query(job: dict, ctx: dict) -> QP.ParsedQuery:
+    """Разобранный запрос: из контекста либо из сохранённого состояния.
+
+    При продолжении/повторном запуске завершённые этапы пропускаются, поэтому
+    живых объектов в контексте нет. Раньше этап 3 падал с KeyError:
+    'parsed_query' (журнал пользователя, ред. 1.4.1) — исследование нельзя было
+    ни продолжить, ни перезапустить.
+    """
+    q = ctx.get("parsed_query")
+    if q is not None:
+        return q
+    r = _research(job)
+    qrow = db.dec(db.one("SELECT * FROM search_queries WHERE research_id=? ORDER BY created_at DESC LIMIT 1",
+                         (r["id"],)), "parsed")
+    if not qrow:
+        raise CoreError("E_VALIDATION", "Отсутствует поисковый запрос исследования")
+    parsed = qrow.get("parsed") or {}
+    if parsed:
+        q = QP.ParsedQuery(**{k: v for k, v in parsed.items() if k in QP.ParsedQuery.__dataclass_fields__})
+    else:
+        q = QP.parse(qrow["raw_text"])
+    ctx["parsed_query"] = q
+    return q
+
+
+def _expansion_from_dict(data: dict) -> EX.Expansion:
+    branches = [EX.Branch(**{k: v for k, v in b.items() if k in EX.Branch.__dataclass_fields__})
+                for b in (data.get("branches") or [])]
+    fields = {k: v for k, v in data.items()
+              if k in EX.Expansion.__dataclass_fields__ and k != "branches"}
+    return EX.Expansion(**fields, branches=branches)
+
+
+def _expansion(job: dict, ctx: dict) -> EX.Expansion:
+    """Расширение запроса: из контекста, из сохранённой модели или пересборкой."""
+    ex = ctx.get("expansion")
+    if ex is not None:
+        return ex
+    r = _research(job)
+    qrow = db.dec(db.one("SELECT * FROM search_queries WHERE research_id=? ORDER BY created_at DESC LIMIT 1",
+                         (r["id"],)), "expansions", "branches")
+    if qrow and qrow.get("expansions"):
+        ex = _expansion_from_dict(qrow["expansions"])
+    else:
+        ex = EX.build(_parsed_query(job, ctx), languages=r.get("language_codes") or ["ru", "en"])
+    ctx["expansion"] = ex
+    return ex
+
+
+def _run_id(job: dict, ctx: dict) -> str | None:
+    """Идентификатор запуска воспроизводимости: незавершённый запуск продолжаем."""
+    if ctx.get("run_id"):
+        return ctx["run_id"]
+    row = db.one("SELECT id FROM research_runs WHERE research_id=? AND status='running' "
+                 "ORDER BY started_at DESC LIMIT 1", (job["research_id"],))
+    if row:
+        ctx["run_id"] = row["id"]
+        return row["id"]
+    return None
+
+
 @W.stage_handler("task_setup")
 def stage_task_setup(job: dict, ctx: dict) -> dict:
     r = _research(job)
@@ -71,10 +132,7 @@ def stage_task_setup(job: dict, ctx: dict) -> dict:
 @W.stage_handler("search_model")
 def stage_search_model(job: dict, ctx: dict) -> dict:
     r = _research(job)
-    q: QP.ParsedQuery = ctx.get("parsed_query")
-    if q is None:
-        qrow = db.dec(db.one("SELECT * FROM search_queries WHERE research_id=? ORDER BY created_at DESC LIMIT 1", (r["id"],)), "parsed")
-        q = QP.ParsedQuery(**{k: v for k, v in qrow["parsed"].items() if k in QP.ParsedQuery.__dataclass_fields__})
+    q: QP.ParsedQuery = _parsed_query(job, ctx)
     ex = EX.build(q, languages=r.get("language_codes") or ["ru", "en"])
     qrow = db.one("SELECT id FROM search_queries WHERE research_id=? ORDER BY created_at DESC LIMIT 1", (r["id"],))
     db.update("search_queries", "id", qrow["id"],
@@ -91,8 +149,8 @@ def stage_search_model(job: dict, ctx: dict) -> dict:
 def stage_source_search(job: dict, ctx: dict) -> dict:
     r = _research(job)
     prof = _profile(r)
-    q = ctx["parsed_query"]
-    ex = ctx["expansion"]
+    q = _parsed_query(job, ctx)
+    ex = _expansion(job, ctx)
     conns = SM.select_connectors(prof)
     if not conns:
         raise CoreError("E_POLICY", "Нет доступных коннекторов по профилю исследования. "
@@ -114,8 +172,22 @@ def stage_document_processing(job: dict, ctx: dict) -> dict:
     dup = db.count("research_documents", "research_id=? AND deduplication_status IN ('DUPLICATE','CLUSTERED')", (rid,))
     langs = db.query("SELECT language, COUNT(*) AS n FROM research_documents WHERE research_id=? GROUP BY language", (rid,))
     dd = DD.summary(rid)
-    W.progress(job["id"], total, total, "Нормализация и дедупликация выполнены в поисковом контуре")
+    # «Дубликат» в корпусе означает «документ уже был известен», в том числе из
+    # ДРУГОГО исследования. Без разделения сводка выглядела противоречием:
+    # «уникальных 0, дублей 91» при первом запуске повторного запроса
+    # (журнал пользователя). Показываем, сколько документов новые для корпуса.
+    new_row = db.one("""SELECT COUNT(*) AS n FROM content_documents d
+                        JOIN (SELECT DISTINCT document_id FROM content_occurrences WHERE research_id=?) o
+                          ON o.document_id=d.id
+                        WHERE d.first_research_id=?""", (rid, rid))
+    new_in_corpus = (new_row or {}).get("n") or 0
+    known_before = max(0, total - new_in_corpus)
+    note = "Нормализация и дедупликация выполнены в поисковом контуре"
+    if known_before:
+        note += f"; ранее известных документов: {known_before} из {total} (корпус общий для исследований)"
+    W.progress(job["id"], total, total, note)
     return {"documents_total": total, "unique": uniq, "duplicates": dup,
+            "new_in_corpus": new_in_corpus, "known_before": known_before,
             "occurrences": dd["occurrences"], "clusters": dd["clusters"], "relations": dd["relations"],
             "languages": {r["language"] or "unknown": r["n"] for r in langs},
             "_state": "completed" if total else "partial"}
@@ -125,7 +197,7 @@ def stage_document_processing(job: dict, ctx: dict) -> dict:
 def stage_relevance_filter(job: dict, ctx: dict) -> dict:
     rid = job["research_id"]
     prof = ctx.get("search_profile") or _profile(_research(job))
-    res = SM.assess_documents(rid, ctx["parsed_query"], ctx["expansion"], prof,
+    res = SM.assess_documents(rid, _parsed_query(job, ctx), _expansion(job, ctx), prof,
                               progress_cb=lambda p, t, m: W.progress(job["id"], p, t, m))
     if not res["assessed"]:
         return {**res, "_state": "partial", "reason": "Нет документов для оценки"}
@@ -208,8 +280,9 @@ def stage_quality_control(job: dict, ctx: dict) -> dict:
 def stage_report(job: dict, ctx: dict) -> dict:
     rid = job["research_id"]
     res = RB.generate(rid)
-    if ctx.get("run_id"):
-        SNAP.finish_run(ctx["run_id"], status="completed", output=res)
+    run_id = _run_id(job, ctx)
+    if run_id:
+        SNAP.finish_run(run_id, status="completed", output=res)
     events.emit("report.ready", research_id=rid, payload={"report_id": res["report_id"],
                                                           "formats": list(res["files"])})
     W.progress(job["id"], 1, 1, "Отчёт сформирован")

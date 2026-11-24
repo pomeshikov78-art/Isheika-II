@@ -1,6 +1,6 @@
 {
   "name": "isheika-ntr-ai-devtools",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "private": true,
   "description": "Dev-инструменты проверки интерфейса «ИЩЕЙКА НТР AI». В рантайме не используются: ядро на стандартной библиотеке Python 3.11+.",
   "scripts": {
