@@ -118,3 +118,107 @@
 Сводные проверки редакции 1.2.0: **112/112** модульных тестов,
 **69/69** проверок API для каждой из 6 ролей (**82/82** в режиме `--run`),
 **61/61** проверок интерфейса, **112/112** тестов внутри Windows-образа.
+
+
+## Исправление «белого экрана» и журнал загрузки (замечание пользователя)
+
+**Симптом:** браузер открывает `127.0.0.1:8000`, заголовок страницы есть, содержимое —
+пустой белый экран, никаких сообщений.
+
+**Причина (установлена измерением):** обработчик статики разбирал путь через
+`os.path.normpath`; на Windows это даёт `\app.js`, `lstrip("/")` не снимает обратный
+слэш, `os.path.join(WEB_DIR, "\app.js")` отбрасывает каталог интерфейса, файл не
+находится — и обработчик подставлял `index.html`. Замер в Windows-образе: все
+8 ресурсов возвращались как `text/html` по 4348 Б вместо своих файлов. Без CSS и
+сценариев оба контейнера (`#login`, `#app`) остаются скрытыми — белый экран.
+
+| Исправление | Реализация | Контрольное испытание | Статус |
+|---|---|---|---|
+| Разбор пути не зависит от ОС | `server.static_target()` — POSIX-правила, отсечение обхода каталога и путей вида `C:\…` | `STATTests::test_STAT_01_path_resolution_is_os_independent`, `::test_STAT_02_traversal_and_absolute_paths` | ✅ |
+| Типы содержимого заданы явно | `server.STATIC_TYPES` / `static_ctype()` — не из реестра ОС | `::test_STAT_03_content_types_are_explicit`; `tools/api_check.py` (тип и размер каждого ресурса) | ✅ |
+| Отсутствующий ресурс — 404 | `_static()` больше не подставляет HTML вместо `.js`/`.css` | `::test_STAT_04_missing_asset_is_404_not_html`; `api_check` (`/no-such-file.js` → 404) | ✅ |
+| Скрытие контейнеров | `[hidden]{display:none !important}` в `styles.css` | `tools/ui_check.mjs` (70/70) | ✅ |
+| Отказ ресурсов ОС — 503 | `server.Server.process_request()` отвечает 503 с причиной и пишет в журнал | `::test_STAT_06_resource_exhaustion_answers_503` | ✅ |
+| Проверка ресурсов в сборке | `build_exe.verify_wine` сверяет размер и тип **каждого** ресурса внутри Windows-образа | `--verify-wine`: **ресурсов 8/8** (до исправления — 0/8) | ✅ |
+| Журнал операций при загрузке | `isheika/boot.py`: шаги запуска, самопроверка, консоль, файлы `boot-log.txt/json`, `GET /api/v1/boot-log` (публичный), `…/history`, `…/export?fmt=txt\|json` | `BOOTTests::test_BOOT_01…07`; `api_check` (журнал, самопроверка, выгрузка) | ✅ |
+| Экран загрузки в браузере | `index.html`: журнал виден до инициализации, перехват ошибок сценариев и ресурсов, сторож 12 с, кнопки «Повторить»/«Скачать журнал»; кнопка 🧾 после входа | `tools/ui_check.mjs`: 6 проверок журнала, включая показ диагностики при отказе | ✅ |
+| Устойчивость инициализации | `app.js`: безопасное связывание обработчиков (`on()`), таймаут запросов 45 с, форма входа показывается всегда | `tools/ui_check.mjs` (70/70), `STAT`/`BOOT` | ✅ |
+
+Сводные проверки после исправления: **144/144** модульных тестов, **94/94** проверок
+API, **70/70** проверок интерфейса; распакованный итоговый образ отдаёт все 8 ресурсов
+с правильными размером и типом, `boot-log` — «исправно», отсутствующий ресурс — 404.
+
+**Ограничение проверки (честно).** Проверка Windows-образа (`--verify-wine`,
+`--verify-launch`, `--verify-tests`) выполнена для сборки `5129d5f38e1f759c…`:
+**ресурсов 8/8**, **143/143** тестов внутри образа, цепочка запуска HTTP 200 / UI 200.
+Итоговый артефакт `86f04ee290a5b524…` отличается от неё только защитой 503 при
+исчерпании потоков, текстом памятки и документацией; повторно прогнать wine не
+удалось — в песочнице исчерпан лимит процессов (791 зомби-процесс wine,
+`can't start new thread` / `Resource temporarily unavailable`). Итоговый артефакт
+проверен на Linux: структура PE/конфигурации/архива, побайтовое совпадение ресурсов,
+типы содержимого, журнал загрузки, 404 на отсутствующий ресурс, все наборы тестов.
+Сведения зафиксированы в `release/BUILD-INFO.json` (`environment_note`,
+`prior_windows_verification`, `linux_verification`).
+
+
+## Эксплуатационный контур (редакция 1.3.0, ROADMAP P6)
+
+| Пункт плана | Реализация | Контрольное испытание | Статус |
+|---|---|---|---|
+| P6 · SLO доступности ≥ 98 %/мес | `isheika/slo.py`: самопроверки `api`/`database`/`storage` (шаг 60 с), окна 24 ч/7 сут/30 сут, бюджет ошибок 2 %, `GET /api/v1/slo`, `POST /api/v1/slo/probes`, планировщик `start_slo_scheduler()` | `SLOTests::test_SLO_01_probes_measure_real_subsystems`, `::test_SLO_03_availability_and_error_budget`; `tools/api_check.py` (окна и цель 98 %) | ✅ |
+| P6 · запрет выдуманных показателей | при отсутствии измерений — `NO_DATA` и `null` (принцип ИД-10) | `SLOTests::test_SLO_02_no_data_is_not_fabricated` | ✅ |
+| P6 · скорость расхода бюджета ошибок | `slo.burn_rate()`, порог 14,4× при ≥ 10 измерениях | `SLOTests::test_SLO_04_burn_rate` | ✅ |
+| P6 · алерты с основаниями | 6 детерминированных правил, `ops_alerts`, автозакрытие по устранении причины, `GET /api/v1/alerts`, `POST /api/v1/alerts/evaluate`, `POST /api/v1/alerts/{id}/acknowledge` | `SLOTests::test_SLO_05_alert_lifecycle`, `::test_SLO_06_acknowledge_is_not_close`, `::test_SLO_07_rules_carry_evidence` | ✅ |
+| P6 · RBAC эксплуатационных маршрутов | чтение — `logs.read`, самопроверки/правила — `settings.read`, создание копии — `keys.write` | `SLOTests::test_SLO_08_routes_and_rbac`; `tools/api_check.py` для 6 ролей | ✅ |
+| P6 · резервные копии | `isheika/backup.py`: снимок БД через sqlite backup API, ключи в шифрованном виде, манифест с SHA-256, реестр `ops_backups`, `GET/POST /api/v1/backups`, `POST /api/v1/backups/{id}/verify` | `BackupTests::test_BKP_01_create_and_verify`, `::test_BKP_06_backup_registered_in_alert_rule` | ✅ |
+| P6 · обнаружение повреждения копии | проверка CRC, сумм, `integrity_check`, состава схемы и счётчиков | `BackupTests::test_BKP_02_corruption_detected`, `::test_BKP_04_restore_rejects_bad_copy` | ✅ |
+| P6 · восстановление с подтверждением | `run.py --restore … --yes`, копия прежнего состояния (`pre-restore`), событие в журнале; без подтверждения — `E_STATE` | `BackupTests::test_BKP_03_restore_requires_confirmation`, `::test_BKP_05_cli_roundtrip` (сквозной цикл в изолированном каталоге данных) | ✅ |
+| P6 · экран эксплуатации | **UI-31** «Эксплуатация: SLO и резервные копии» (3 вкладки, экспорт таблиц, действия оператора) | `tools/ui_check.mjs` — 64/64, включая `ops`, `ops?tab=alerts`, `ops?tab=backups` | ✅ |
+| P6 · метрики и регламент | `isheika_slo_*`, `isheika_alerts_open`, `isheika_backups_total`; `docs/RECOVERY.md` | `tools/api_check.py` (`GET /metrics`), вычитка регламента | ✅ |
+| Миграция схемы | `storage/migrate.py::migrate_0004_ops` — `service_probes`, `ops_alerts`, `ops_backups` (идемпотентно) | применение к существующей БД и к свежей схеме | ✅ |
+
+Сводные проверки редакции 1.3.0: **131/131** модульных тестов, API — все проверки
+пройдены для каждой из 6 ролей (78–82 в зависимости от роли), **93/93** в режиме
+`--run`, **64/64** проверок интерфейса, **87** маршрутов REST, **131/131** тестов
+внутри Windows-образа. Регламент эксплуатации — `docs/RECOVERY.md`.
+
+
+## Исправление запуска единого файла (замечание пользователя)
+
+**Симптом:** при запуске `ISHEIKA-NTR-AI.exe` модуль 7-Zip показывал
+«Не удается найти указанный файл».
+
+**Причина (установлена по исходнику `CPP/7zip/Bundles/SFXSetup/SfxSetup.cpp`, LZMA SDK):**
+`RunProgram` выполняется как `CreateProcess(NULL, dirPrefix + RunProgram)`, где
+`dirPrefix` по умолчанию `".\"`. Конфигурация `RunProgram="cmd /c start.cmd"`
+превращалась в командную строку `".\cmd /c start.cmd"`, то есть исполняемым файлом
+считался `.\cmd` → `ERROR_FILE_NOT_FOUND` → именно это сообщение.
+
+**Исправление:** запуск переведён на `ExecuteFile="cmd.exe"` +
+`ExecuteParameters="/c isheika.cmd"` — ветка `ShellExecuteEx` не добавляет префикс,
+`cmd.exe` находится в System32, рабочий каталог уже установлен в каталог распаковки.
+Дополнительно: браузер открывает сама программа (`--open-browser`), при занятом
+порте берётся следующий свободный (`--port-auto`), номер порта в `isheika.cmd`
+принимается только числом (SFX дописывает свои ключи в командную строку),
+проверка выполняется средствами cmd без `findstr`.
+
+| Проверка | Что подтверждает | Статус |
+|---|---|---|
+| `PKGTests::test_PKG_01_sfx_launch_uses_shellexecute` | в конфигурации нет `RunProgram`, запуск только через `ExecuteFile` — регрессия исключена | ✅ |
+| `PKGTests::test_PKG_02_launch_cmd_contract` | сценарий `isheika.cmd` (имя не совпадает с внутренней командой cmd) ведёт к `python\python.exe`, данные вне temp, числовая проверка порта | ✅ |
+| `PKGTests::test_PKG_03_structure_parser` | структура файла: PE + конфигурация + сигнатура 7z, механизм запуска распознан | ✅ |
+| `PKGTests::test_PKG_04_cli_flags_present` | точка входа поддерживает `--open-browser` / `--port-auto` | ✅ |
+| `PKGTests::test_PKG_05_port_fallback` | занятый порт → следующий свободный; без флага — понятная ошибка `E_STATE` | ✅ |
+| `tools/build_exe.py --verify-launch` | цепочка `cmd.exe /c isheika.cmd` → `python.exe` → сервер: HTTP 200, интерфейс 200 | ✅ |
+| `release/ISHEIKA-NTR-AI-portable.zip` | запасной путь поставки без SFX (распаковать → `isheika.cmd`) | ✅ |
+
+32-битный SFX-заголовок в песочнице сборки не исполняется (seccomp блокирует
+32-битный загрузчик wine), поэтому проверка разделена: семантика запуска
+сверена с исходником модуля, а цепочка запуска проверяется реальным исполнением
+`cmd.exe /c isheika.cmd` внутри распакованного образа.
+
+**Второе замечание, найденное исполнением:** сценарий с именем `start.cmd`
+не запускался — парсер `cmd` принимает `start` за внутреннюю команду `START`,
+а `.cmd` за её аргумент, и выдаёт «ShellExecuteEx failed: File not found».
+Сценарий переименован в `isheika.cmd`; проверка `--verify-launch` выполняется
+тем же вызовом, что и в конфигурации SFX.
