@@ -1,0 +1,418 @@
+{
+ "checked_at": "2026-11-23T20:04:45Z",
+ "network_enabled": true,
+ "items": [
+  {
+   "code": "CON-ARXIV",
+   "status": "active",
+   "sample": 1,
+   "checked_at": "2026-11-23T20:04:25Z",
+   "reason": "",
+   "latency_ms": 2567,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "rps": 0.33,
+    "note": "1 запрос / 3 секунды"
+   },
+   "source_code": "SRC-0010",
+   "docs_url": "https://info.arxiv.org/help/api/index.html"
+  },
+  {
+   "code": "CON-CORE",
+   "status": "restricted",
+   "reason": "Требуется ключ/регистрация — источник в статусе RESTRICTED",
+   "checked_at": "2026-11-23T20:04:25Z",
+   "latency_ms": 0,
+   "implementation": "live",
+   "requires_key": true,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "per_day": 1000,
+    "note": "Personal 1000/сут и 25/мин; Academic 5000/сут и 10/мин; скачивание PDF в обход API запрещено"
+   },
+   "source_code": "SRC-0039",
+   "docs_url": null
+  },
+  {
+   "code": "CON-CROSSREF",
+   "status": "active",
+   "sample": 1,
+   "checked_at": "2026-11-23T20:04:26Z",
+   "reason": "",
+   "latency_ms": 768,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "rps": 1,
+    "rps_polite": 3,
+    "note": "Списочные запросы 1 req/s public / 3 req/s polite (CH-02)"
+   },
+   "source_code": "SRC-0043",
+   "docs_url": "https://api.crossref.org/swagger-ui/index.html"
+  },
+  {
+   "code": "CON-DATACITE",
+   "status": "active",
+   "sample": 1,
+   "checked_at": "2026-11-23T20:04:27Z",
+   "reason": "",
+   "latency_ms": 816,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "rps": 3
+   },
+   "source_code": "SRC-0403",
+   "docs_url": null
+  },
+  {
+   "code": "CON-DOAJ",
+   "status": "active",
+   "sample": 1,
+   "checked_at": "2026-11-23T20:04:27Z",
+   "reason": "",
+   "latency_ms": 322,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "rps": 2,
+    "note": "Пауза ≈0.5 с между запросами"
+   },
+   "source_code": "SRC-0054",
+   "docs_url": null
+  },
+  {
+   "code": "CON-EPO-OPS",
+   "status": "restricted",
+   "reason": "Требуется ключ/регистрация — источник в статусе RESTRICTED",
+   "checked_at": "2026-11-23T20:04:27Z",
+   "latency_ms": 0,
+   "implementation": "live",
+   "requires_key": true,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "bytes_per_week": 4294967296,
+    "hard_stop_bytes": 3865470566,
+    "bandwidth_bps": 1000000,
+    "note": "4 ГБ/неделю; жёсткий стоп на 90%; тяжёлые выгрузки 19:00–07:00 GMT (CH-03)"
+   },
+   "source_code": "SRC-0276",
+   "docs_url": null
+  },
+  {
+   "code": "CON-ESPACENET-GUI",
+   "status": "not_implemented",
+   "checked_at": "2026-11-23T20:04:27Z",
+   "latency_ms": 0,
+   "implementation": "manual",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "respect",
+   "limits": {
+    "note": "≤10 поисковых действий/мин, роботы запрещены — автоматический сбор заблокирован стоп-листом STOP-03"
+   },
+   "source_code": "SRC-0277",
+   "docs_url": null
+  },
+  {
+   "code": "CON-EUROPEPMC",
+   "status": "active",
+   "sample": 1,
+   "checked_at": "2026-11-23T20:04:28Z",
+   "reason": "",
+   "latency_ms": 924,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "rps": 3
+   },
+   "source_code": "SRC-0067",
+   "docs_url": null
+  },
+  {
+   "code": "CON-GITHUB",
+   "status": "active",
+   "sample": 1,
+   "checked_at": "2026-11-23T20:04:29Z",
+   "reason": "",
+   "latency_ms": 431,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "per_hour": 60,
+    "per_hour_token": 5000
+   },
+   "source_code": "SRC-0553",
+   "docs_url": null
+  },
+  {
+   "code": "CON-HAL",
+   "status": "active",
+   "sample": 1,
+   "checked_at": "2026-11-23T20:04:30Z",
+   "reason": "",
+   "latency_ms": 1696,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "rps": 2
+   },
+   "source_code": "SRC-0083",
+   "docs_url": null
+  },
+  {
+   "code": "CON-KIPRIS",
+   "status": "restricted",
+   "reason": "Реализация коннектора не завершена (каталог ≠ подключение)",
+   "checked_at": "2026-11-23T20:04:30Z",
+   "latency_ms": 0,
+   "implementation": "stub",
+   "requires_key": true,
+   "key_configured": false,
+   "robots_policy": "respect",
+   "limits": {
+    "per_month": 1000,
+    "note": "Бесплатно 1000 обращений/мес, далее деградация на OPS (CH-05)"
+   },
+   "source_code": "SRC-X-CON-KIPRIS",
+   "docs_url": null
+  },
+  {
+   "code": "CON-LENS",
+   "status": "not_implemented",
+   "checked_at": "2026-11-23T20:04:30Z",
+   "latency_ms": 0,
+   "implementation": "stub",
+   "requires_key": true,
+   "key_configured": false,
+   "robots_policy": "respect",
+   "limits": {
+    "note": "Институциональная подписка/заявка на trial — класс A2"
+   },
+   "source_code": "SRC-0113",
+   "docs_url": null
+  },
+  {
+   "code": "CON-NTRS",
+   "status": "error",
+   "reason": "HTTP 403: доступ запрещён или требуется ключ",
+   "error_code": "E_POLICY",
+   "checked_at": "2026-11-23T20:04:31Z",
+   "latency_ms": 830,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "rps": 2,
+    "note": "Без ключа; при 403 фиксировать деградацию, не подменять данные"
+   },
+   "source_code": "SRC-0720",
+   "docs_url": null
+  },
+  {
+   "code": "CON-OPENAIRE",
+   "status": "active",
+   "sample": 1,
+   "checked_at": "2026-11-23T20:04:32Z",
+   "reason": "",
+   "latency_ms": 940,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "rps": 2,
+    "note": "XML Search API отключён 31.05.2026 — только Graph API"
+   },
+   "source_code": "SRC-0158",
+   "docs_url": null
+  },
+  {
+   "code": "CON-OPENALEX",
+   "status": "active",
+   "sample": 1,
+   "checked_at": "2026-11-23T20:04:34Z",
+   "reason": "",
+   "latency_ms": 1744,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "rps": 10,
+    "per_day": null,
+    "credit_budget_usd_day": 1,
+    "note": "Без ключа — общий бесплатный дневной бюджет и только первая страница; с ключом $1/сут, 30 req/s (CH-01)"
+   },
+   "source_code": "SRC-0451",
+   "docs_url": "https://docs.openalex.org/"
+  },
+  {
+   "code": "CON-OSTI",
+   "status": "active",
+   "sample": 1,
+   "checked_at": "2026-11-23T20:04:35Z",
+   "reason": "",
+   "latency_ms": 1085,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "rps": 2
+   },
+   "source_code": "SRC-0166",
+   "docs_url": null
+  },
+  {
+   "code": "CON-ROR",
+   "status": "active",
+   "sample": 1,
+   "checked_at": "2026-11-23T20:04:36Z",
+   "reason": "",
+   "latency_ms": 940,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "rps": 3
+   },
+   "source_code": "SRC-0456",
+   "docs_url": null
+  },
+  {
+   "code": "CON-S2AG",
+   "status": "error",
+   "reason": "HTTP 429",
+   "error_code": "E_RATE_LIMIT",
+   "checked_at": "2026-11-23T20:04:43Z",
+   "latency_ms": 6716,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "rps": 1,
+    "note": "Без ключа ≈100 запросов/5 мин"
+   },
+   "source_code": "SRC-0207",
+   "docs_url": null
+  },
+  {
+   "code": "CON-SIM",
+   "status": "active",
+   "simulated": true,
+   "checked_at": "2026-11-23T20:04:43Z",
+   "reason": "Имитационный адаптер DEV-профиля",
+   "latency_ms": 0,
+   "implementation": "simulation",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "respect",
+   "limits": {},
+   "source_code": "SRC-X-CON-SIM",
+   "docs_url": null
+  },
+  {
+   "code": "CON-STACKEXCHANGE",
+   "status": "active",
+   "sample": 1,
+   "checked_at": "2026-11-23T20:04:44Z",
+   "reason": "",
+   "latency_ms": 1010,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "per_day": 300,
+    "note": "quota_remaining читается из ответа"
+   },
+   "source_code": "SRC-0709",
+   "docs_url": null
+  },
+  {
+   "code": "CON-UNPAYWALL",
+   "status": "restricted",
+   "reason": "Требуется ключ/регистрация — источник в статусе RESTRICTED",
+   "checked_at": "2026-11-23T20:04:44Z",
+   "latency_ms": 0,
+   "implementation": "live",
+   "requires_key": true,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "per_day": 100000
+   },
+   "source_code": "SRC-0235",
+   "docs_url": null
+  },
+  {
+   "code": "CON-USPTO-ODP",
+   "status": "restricted",
+   "reason": "Требуется ключ/регистрация — источник в статусе RESTRICTED",
+   "checked_at": "2026-11-23T20:04:44Z",
+   "latency_ms": 0,
+   "implementation": "live",
+   "requires_key": true,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "note": "Ключ: USPTO.gov + ID.me; удаление ключа после 90 дней простоя (CH-04)"
+   },
+   "source_code": "SRC-0238",
+   "docs_url": null
+  },
+  {
+   "code": "CON-WIKIDATA",
+   "status": "not_implemented",
+   "checked_at": "2026-11-23T20:04:44Z",
+   "latency_ms": 0,
+   "implementation": "stub",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "respect",
+   "limits": {
+    "note": "Только как вспомогательный источник «Д» для фактов"
+   },
+   "source_code": "SRC-X-CON-WIKIDATA",
+   "docs_url": null
+  },
+  {
+   "code": "CON-ZENODO",
+   "status": "active",
+   "sample": 1,
+   "checked_at": "2026-11-23T20:04:45Z",
+   "reason": "",
+   "latency_ms": 959,
+   "implementation": "live",
+   "requires_key": false,
+   "key_configured": false,
+   "robots_policy": "api_terms",
+   "limits": {
+    "rps": 2
+   },
+   "source_code": "SRC-0439",
+   "docs_url": null
+  }
+ ]
+}
