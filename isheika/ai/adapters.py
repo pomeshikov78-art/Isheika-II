@@ -15,6 +15,7 @@ import urllib.request
 import urllib.parse
 from typing import Any
 
+from .. import tls
 from ..config import SETTINGS
 from ..contracts import AIRequest, AIResponse, CoreError, iso_now
 from ..storage.secrets import SecretStore, mask
@@ -40,7 +41,7 @@ class BaseAdapter:
         t0 = time.time()
         req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:
+            with urllib.request.urlopen(req, timeout=timeout, context=tls.context()) as r:
                 body = r.read().decode("utf-8", "replace")
                 return r.status, dict(r.headers.items()), body, int((time.time() - t0) * 1000)
         except urllib.error.HTTPError as e:

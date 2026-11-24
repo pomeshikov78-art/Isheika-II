@@ -20,9 +20,10 @@ from dataclasses import dataclass
 from ..analytics import methodologies as M
 from ..contracts import Document, iso_now
 from .expansion import Expansion
-from .query_parser import ParsedQuery, ENTITY_LEXICON, PURPOSE_LEXICON, CONTEXT_LEXICON, tokenize
+from .query_parser import (ParsedQuery, ENTITY_LEXICON, PURPOSE_LEXICON, CONTEXT_LEXICON,
+                           SHORT_TECH, AMBIGUOUS_SHORT, tokenize)
 
-_WORD = re.compile(r"[a-zA-Zа-яА-ЯёЁ0-9]{3,}")
+_WORD = re.compile(r"[a-zA-Zа-яА-ЯёЁ0-9]{2,}")
 
 
 @dataclass
@@ -76,7 +77,18 @@ CLASS_ALIASES = {"A": "DIRECT", "B": "ADJACENT", "C": "BELOW_THRESHOLD"}
 
 
 def _terms_of(text: str) -> set[str]:
-    return set(w.lower() for w in _WORD.findall(text or ""))
+    """Термины документа — по ТОМУ ЖЕ правилу, что и термины запроса (ИД-19).
+
+    Ранее документовский фильтр `{3,}` отбрасывал короткие технические
+    обозначения («6G», «THz», «RF»), которые токенизатор запроса сохраняет:
+    ядро не находилось в самом профильном материале, S и K обнулялись.
+    """
+    out: set[str] = set()
+    for w in _WORD.findall(text or ""):
+        w = w.lower()
+        if len(w) > 2 or w in SHORT_TECH or re.fullmatch(r"\d+[a-z]{1,3}", w):
+            out.add(w)
+    return out
 
 
 def _phrase_hit(phrase: str, blob: str) -> bool:
@@ -123,7 +135,18 @@ def assess(doc: Document, q: ParsedQuery, ex: Expansion, *,
     core_words = [t for t in core_terms if " " not in t]
 
     phrase_hits = [p for p in core_phrases if _phrase_hit(p, blob)]
-    word_hits = [t for t in core_words if t[:6] in {x[:6] for x in dterms}]
+    dstems = {x[:6] for x in dterms}
+    all_word_hits = [t for t in core_words if t[:6] in dstems]
+    strong_hits = [t for t in all_word_hits if t not in AMBIGUOUS_SHORT]
+    amb_hits = [t for t in all_word_hits if t in AMBIGUOUS_SHORT]
+
+    # ИД-19: обозначение-омоним засчитывается только при независимом подтверждении
+    # предметной области (иначе «Rhodamine 6G» проходил бы как стандарт связи).
+    domain_keys = [k for ent in q.entities for k in ENTITY_LEXICON.get(ent, []) if k not in AMBIGUOUS_SHORT]
+    domain_keys += [k for pp in q.purpose for k in PURPOSE_LEXICON.get(pp, []) if k not in AMBIGUOUS_SHORT]
+    amb_ok = bool(strong_hits or phrase_hits or any(k in blob for k in domain_keys))
+    word_hits = strong_hits + (amb_hits if amb_ok else [])
+    effective_core_words = [t for t in core_words if t not in AMBIGUOUS_SHORT or amb_ok]
     title_blob = (doc.title or "").lower()
 
     # Термы расширения — СИНОНИМЫ, а не независимые требования:
@@ -151,7 +174,7 @@ def assess(doc: Document, q: ParsedQuery, ex: Expansion, *,
                   max(1.0, sum(math.log(1 + corpus_n / (1 + corpus_df.get(t, 0))) for t in qterms))
     overlap = _stem_overlap(qterms, dterms)
     title_exact = any(_phrase_hit(p, title_blob) for p in core_phrases) or \
-                  any(t[:6] in {x[:6] for x in _terms_of(title_blob)} for t in core_words)
+                  any(t[:6] in {x[:6] for x in _terms_of(title_blob)} for t in effective_core_words)
     S = max(0.92 if title_exact else 0.0,
             0.80 if any_exact else 0.0,
             min(1.0, 0.45 * overlap + 0.25 * (idf or overlap)))
@@ -160,12 +183,12 @@ def assess(doc: Document, q: ParsedQuery, ex: Expansion, *,
     ent_hits = 0
     ent_total = max(1, len(q.entities))
     for ent in q.entities:
-        keys = ENTITY_LEXICON.get(ent, [])
+        keys = [k for k in ENTITY_LEXICON.get(ent, []) if amb_ok or k not in AMBIGUOUS_SHORT]
         if any(k in blob for k in keys):
             ent_hits += 1
     purpose_hits = 0
     for pp in q.purpose:
-        keys = PURPOSE_LEXICON.get(pp, [])
+        keys = [k for k in PURPOSE_LEXICON.get(pp, []) if amb_ok or k not in AMBIGUOUS_SHORT]
         if any(k in blob for k in keys):
             purpose_hits += 1
     if q.entities:

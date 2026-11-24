@@ -14,7 +14,12 @@ window.Screens = window.Screens || {};
     App.wireResearchBar(body);
     return document.getElementById('rs-body');
   }
-  const docLink = d => `<a href="#/document/${esc(d.id || d)}">${esc(App.short(d.title || d.id || d, 90))}</a>`;
+  const docLink = d => {
+    const ru = d.title_ru || d.title || d.id || d;
+    const orig = d.title_ru && d.title_ru !== d.title ? d.title : '';
+    return `<a href="#/document/${esc(d.id || d)}">${esc(App.short(ru, 90))}</a>`
+      + (orig ? `<div class="tiny muted">${esc(App.short(orig, 80))}${d.translation_mode === 'terminology' ? ' · перевод терминологический' : d.translation_mode === 'ai_technical' ? ' · перевод ИИ' : ''}</div>` : '');
+  };
   const evItem = e => `<div class="evidence-item">
       <div class="row">${App.statusTag(e.status)} ${App.tag(e.evidence_class || 'unknown')} ${App.tag('маркер ' + (e.marker || 'Д'))}
         ${e.quality != null ? `<span class="tiny muted">качество ${App.num(e.quality, 2)}</span>` : ''}
@@ -23,6 +28,27 @@ window.Screens = window.Screens || {};
       <div class="tiny muted">${esc(e.locator || '')} ${e.document_id ? `· <a href="#/document/${esc(e.document_id)}">документ</a>` : ''}
         ${e.url ? `· <a href="${esc(e.url)}" target="_blank" rel="noopener noreferrer">первоисточник ↗</a>` : ''}
         ${e.archive_url ? `· <a href="${esc(e.archive_url)}" target="_blank" rel="noopener noreferrer">архив ↗</a>` : ''}</div></div>`;
+
+  const TR_MODE = {original: 'оригинал на русском', terminology: 'терминологический перевод (черновик)',
+                   ai_technical: 'перевод моделью ИИ'};
+
+  function translationBlock(d) {
+    const t = d.translation;
+    if (!t) return '';
+    if (t.mode === 'original') return '<p class="tiny muted" style="margin-top:6px">Материал на русском языке — перевод не требуется.</p>';
+    const cov = t.coverage == null ? '—' : Math.round(t.coverage * 100) + ' %';
+    const unknown = (t.untranslated || []).slice(0, 12);
+    return `<div class="card" style="margin-top:10px;background:var(--panel-2)">
+      <div class="row">${App.tag(TR_MODE[t.mode] || t.mode, t.mode === 'ai_technical' ? 'ok' : 'warn')}
+        <span class="tiny muted">переведено ${cov} · словарь ${esc(t.glossary_version || '—')}${t.review_required ? ' · требует вычитки' : ''}</span></div>
+      <p style="margin:6px 0"><b>${esc(t.title_ru || '')}</b></p>
+      <p class="tiny">${esc(t.abstract_ru || '')}</p>
+      ${unknown.length ? `<p class="tiny muted">Без перевода остались: ${esc(unknown.join(', '))}</p>` : ''}
+      <details class="acc"><summary>Оригинал</summary>
+        <p class="tiny">${esc(d.title || '')}</p><p class="tiny muted">${esc(d.abstract || '')}</p></details>
+      <p class="tiny muted">Числа, единицы измерения и обозначения сохранены без изменений.</p>
+    </div>`;
+  }
 
   // ============================================================ UI-01 Главная панель
   Screens.dashboard = {
@@ -270,7 +296,10 @@ window.Screens = window.Screens || {};
         const body = collect();
         if (!body.query) { App.toast('Введите поисковый запрос', 'warn'); return; }
         try {
-          const r = await App.post('/api/v1/researches', body, 'create:' + body.query);
+          // ИД-22: ключ идемпотентности уникален для ДЕЙСТВИЯ, а не для текста
+          // запроса: повтор после сбоя возвращает то же исследование, а новое
+          // исследование с тем же запросом создаётся заново.
+          const r = await App.post('/api/v1/researches', body, 'create:' + App.uid('idem-'));
           await App.loadResearches(true);
           App.setResearch(r.id, true);
           App.toast('Исследование создано: ' + esc(r.title), 'ok');
@@ -366,7 +395,9 @@ window.Screens = window.Screens || {};
           <input type="text" id="f-lang" placeholder="язык" style="width:80px">
           <select id="f-sort"><option value="score">по релевантности</option><option value="date">по дате</option><option value="title">по названию</option></select>
           <button class="btn sm primary" id="f-apply">Применить</button>
+          <button class="btn sm" id="f-translate" title="Технический перевод найденных материалов на русский язык">Перевести на русский</button>
           <span class="tiny muted" id="f-total"></span>
+          <span class="tiny muted" id="f-trn"></span>
         </div><div id="docs-box">${App.spinner()}</div></div>
         ${App.alert('info', 'R = 0,30·S + 0,25·T + 0,15·C + 0,15·E + 0,10·K + 0,05·F. Пороги: ≥ 0,80 — прямое соответствие; 0,60–0,79 — смежное; &lt; 0,60 — исключается. Значения рассчитаны серверным ядром (ТЗ-03 §3).')}`;
       const load = async () => {
@@ -436,7 +467,26 @@ window.Screens = window.Screens || {};
       };
       document.getElementById('f-apply').addEventListener('click', load);
       document.getElementById('f-q').addEventListener('keydown', e => { if (e.key === 'Enter') load(); });
-      await load();
+      const trnInfo = async () => {
+        try {
+          const t = await App.get(`/api/v1/researches/${rid}/translation`);
+          const modes = t.modes || {};
+          const term = (modes.terminology || {}).count || 0, ai = (modes.ai_technical || {}).count || 0;
+          App.setHTML('f-trn', `· перевод: ${t.translated || 0} (ИИ ${ai}, терминология ${term})`
+            + (t.review_required ? `, вычитка ${t.review_required}` : ''));
+        } catch (e) { App.setHTML('f-trn', ''); }
+      };
+      const trBtn = document.getElementById('f-translate');
+      if (trBtn) trBtn.addEventListener('click', async () => {
+        trBtn.disabled = true;
+        try {
+          const res = await App.post(`/api/v1/researches/${rid}/translate`, {});
+          App.toast(`Переведено материалов: ${res.translated} (ИИ ${res.ai_mode}, терминология ${res.terminology_mode})`, 'ok', 4000);
+          await load(); await trnInfo();
+        } catch (e) { App.toast(e.message || 'Перевод не выполнен', 'err', 5000); }
+        finally { trBtn.disabled = false; }
+      });
+      await load(); await trnInfo();
       App.ctx(App.alert('info', 'Действия с документом: «Открыть источник», «В доказательства», «В паспорт», «Исключить». Ручная разметка релевантности (0/1/2) используется для калибровки метрик Precision@10 и nDCG@10.'));
     },
   };
@@ -444,10 +494,11 @@ window.Screens = window.Screens || {};
   function cardHTML(d) {
     const comp = d.components || {};
     return `<div class="card" data-doc="${esc(d.id)}">
-      <div class="spread"><b>${esc(d.title || '(без названия)')}</b>
+      <div class="spread"><b>${esc(d.title_ru || d.title || '(без названия)')}</b>
         <span class="row">${App.statusTag(d.rclass || d.state)}<span class="pill">R ${App.num(d.score, 3)}</span></span></div>
       <div class="tiny muted">${esc(d.doc_type || '—')} · ${esc(d.source_code || '—')} · ${esc(d.country_code || '—')} · ${App.donly(d.published_at)} · ${esc(d.evidence_class || '')} · маркер ${esc(d.marker || 'Д')}</div>
-      <p class="tiny">${esc(App.short(d.abstract || d.text_excerpt || 'Аннотация отсутствует в источнике', 340))}</p>
+      <p class="tiny">${esc(App.short(d.abstract_ru || d.abstract || d.text_excerpt || 'Аннотация отсутствует в источнике', 340))}</p>
+      ${d.title_ru && d.title_ru !== d.title ? `<p class="tiny muted">Оригинал: ${esc(App.short(d.title, 120))}${d.translation_mode === 'terminology' ? ' · терминологический перевод, требует вычитки' : d.translation_mode === 'ai_technical' ? ' · перевод ИИ' : ''}</p>` : ''}
       <div class="tiny muted">Компоненты: S ${App.num(comp.S, 2)} · T ${App.num(comp.T, 2)} · C ${App.num(comp.C, 2)} · E ${App.num(comp.E, 2)} · K ${App.num(comp.K, 2)} · F ${App.num(comp.F, 2)} ${d.reason ? '· ' + esc(App.short(d.reason, 120)) : ''}</div>
       <div class="row" style="margin-top:8px">
         <a class="btn sm" href="#/document/${esc(d.id)}">Карточка</a>
@@ -513,7 +564,8 @@ window.Screens = window.Screens || {};
               ${d.url ? `<a class="btn sm primary" href="${esc(d.url)}" target="_blank" rel="noopener noreferrer">Открыть первоисточник ↗</a>` : ''}
               <button class="btn sm" id="d-ev">В доказательства</button>
               <button class="btn sm danger" id="d-excl">Исключить</button></div>
-            <p class="tiny" style="margin-top:10px">${esc(d.abstract || 'Аннотация отсутствует в источнике.')}</p>
+            <p class="tiny" style="margin-top:10px">${esc((d.translation && d.translation.abstract_ru) || d.abstract || 'Аннотация отсутствует в источнике.')}</p>
+            ${translationBlock(d)}
             ${d.text_excerpt ? `<details class="acc"><summary>Фрагмент текста</summary><div class="tiny">${esc(d.text_excerpt)}</div></details>` : ''}`)}
           ${App.card('Релевантность (серверное ядро)', `
             <div class="grid g3">${App.kpi('R', App.num(rel.score, 3), esc(rel.class || ''))}

@@ -1,18 +1,18 @@
 {
   "artifact": "/tmp/arena/tenants/71ebd7cc-b365-41c5-863c-79f587b1df1f/sessions/f005aeb6-2bf1-5ac0-9c2e-bbd5597fcc55/workspace/repo/release/ISHEIKA-NTR-AI.exe",
-  "app_version": "1.4.2",
+  "app_version": "1.5.1",
   "python": "3.11.9",
-  "built_at": "2026-11-24T18:29:26+00:00",
-  "size_bytes": 10045993,
-  "sha256": "6fff77fb157696a992e7eaa58ef8fa2c99d9570a0547c4a9687b6d4b6beeb0c3",
+  "built_at": "2026-11-24T21:37:08+00:00",
+  "size_bytes": 10224730,
+  "sha256": "bf9e7aabb6dcfb3f84fb1e93f6f4907d02c0c8780795296dc0a9ee9ca4319c11",
   "sfx": {
     "file": "/tmp/arena/tenants/71ebd7cc-b365-41c5-863c-79f587b1df1f/sessions/f005aeb6-2bf1-5ac0-9c2e-bbd5597fcc55/workspace/repo/tools/vendor/7zSD.sfx",
     "sha256": "18b4c189f195d55fe1e6c08d6a186d31c89d6c3c55afe122a55230078f7ea294",
     "size_bytes": 128000
   },
   "payload": {
-    "files_in_app": 115,
-    "archive_bytes": 9917615,
+    "files_in_app": 131,
+    "archive_bytes": 10096352,
     "config_bytes": 378,
     "top_level": [
       "VERSION.txt",
@@ -27,8 +27,8 @@
   "sevenzip": "/usr/bin/7z",
   "portable_zip": {
     "file": "/tmp/arena/tenants/71ebd7cc-b365-41c5-863c-79f587b1df1f/sessions/f005aeb6-2bf1-5ac0-9c2e-bbd5597fcc55/workspace/repo/release/ISHEIKA-NTR-AI-portable.zip",
-    "size_bytes": 12280104,
-    "sha256": "bef4b2e78dad996adc2c741017aa684d04c6290b96a0220147ec317143c9142f",
+    "size_bytes": 12494159,
+    "sha256": "28b11b378bb4070e422c535f5880ded0fcd4ec99f4da1aba9403e87143a3e2a5",
     "note": "распаковать и запустить isheika.cmd — тот же образ без SFX"
   },
   "structure": {
@@ -101,8 +101,8 @@
       {
         "asset": "screens_core.js",
         "http": 200,
-        "bytes": 94006,
-        "expected_bytes": 94006,
+        "bytes": 98227,
+        "expected_bytes": 98227,
         "ctype": "application/javascript; charset=utf-8",
         "ok": true
       },
@@ -141,13 +141,13 @@
       {
         "asset": "app.js",
         "http": 200,
-        "bytes": 53545,
-        "expected_bytes": 53545,
+        "bytes": 56255,
+        "expected_bytes": 56255,
         "ctype": "application/javascript; charset=utf-8",
         "ok": true
       }
     ],
-    "log_tail": "ИЩЕЙКА НТР AI · профиль DEV · http://127.0.0.1:8011/\nЗагрузка boot-da2e427f-55e5-4e63-923f-6b9e63761246: исправно\n  ✓ Конфигурация — профиль DEV, сеть выкл, платный ИИ запрещён\n  ✓ Каталоги данных\n  ✓ База данных и миграции — 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal\n  ✓ Реестры источников и методик — источников 806, стран 35, коннекторов 24\n  ✓ Обработчики этапов — workflow.pipeline импортирован\n  ✓ Ресурсы интерфейса — проверено 9\n  ✓ Маршруты API — 97 маршрутов\n  ✓ Привязка порта — 127.0.0.1:8011\n  ✓ Планировщик самопроверок — шаг 60 с\n  ✓ Каталог данных доступен на запись — /tmp/isheika-exe-data\n  ✓ База данных целостна — quick_check=ok; миграции: 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal\n  ✓ Реестры загружены — registry_sources=806; dict_countries=35; registry_connectors=24; ai_providers=18\n  ✓ Ресурсы интерфейса на месте — проверено 9\n  ✓ Маршруты API зарегистрированы — 97 маршрутов\n  ✓ Подсистемы отвечают — api=ok (0.006 мс); database=ok (8.894 мс); storage=ok (4.091 мс)\nЖурнал загрузки: /tmp/isheika-exe-data\\boot-log.txt\nДиагностика в браузере: http://127.0.0.1:8011/api/v1/boot-log\n",
+    "log_tail": "ИЩЕЙКА НТР AI · профиль DEV · http://127.0.0.1:8011/\nЗагрузка boot-8e96a31c-c78f-412a-ab6e-a1e830f775ef: исправно\n  ✓ Конфигурация — профиль DEV, сеть выкл, платный ИИ запрещён\n  ✓ Каталоги данных\n  ✓ База данных и миграции — 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal, 0007_translation, 0008_idempotency\n  ✓ Реестры источников и методик — источников 806, стран 35, коннекторов 24\n  ✓ Обработчики этапов — workflow.pipeline импортирован\n  ✓ Ресурсы интерфейса — проверено 9\n  ✓ Маршруты API — 100 маршрутов\n  ✓ Привязка порта — 127.0.0.1:8011\n  ✓ Планировщик самопроверок — шаг 60 с\n  ✓ Каталог данных доступен на запись — /tmp/isheika-exe-data\n  ✓ База данных целостна — quick_check=ok; миграции: 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal, 0007_translation, 0008_idempotency\n  ✓ Реестры загружены — registry_sources=806; dict_countries=35; registry_connectors=24; ai_providers=18\n  ✓ Ресурсы интерфейса на месте — проверено 9\n  ✓ Маршруты API зарегистрированы — 100 маршрутов\n  ✓ Доверенные сертификаты на месте — корней всего 153; системных 153; в наборе приложения 150\n  ✓ Подсистемы отвечают — api=ok (0.012 мс); database=ok (8.259 мс); storage=ok (3.506 мс)\nЖурнал загрузки: /tmp/isheika-exe-data\\boot-log.txt\nДиагностика в браузере: http://127.0.0.1:8011/api/v1/boot-log\n",
     "ok": true
   },
   "wine_launch": {
@@ -171,7 +171,7 @@
       }
     ],
     "ui_bytes": 16245,
-    "log_tail": " · http://127.0.0.1:8021/\nЗагрузка boot-43946ce4-8ade-4c6a-8c52-d3a0cf0c7baf: исправно\n  ✓ Конфигурация — профиль DEV, сеть вкл, платный ИИ запрещён\n  ✓ Каталоги данных\n  ✓ База данных и миграции — 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal\n  ✓ Реестры источников и методик — источников 806, стран 35, коннекторов 24\n  ✓ Обработчики этапов — workflow.pipeline импортирован\n  ✓ Ресурсы интерфейса — проверено 9\n  ✓ Маршруты API — 97 маршрутов\n  ✓ Привязка порта — 127.0.0.1:8021\n  ✓ Планировщик самопроверок — шаг 60 с\n  ✓ Каталог данных доступен на запись — C:\\users\\root\\AppData\\Local\\IsheikaNTR-AI\n  ✓ База данных целостна — quick_check=ok; миграции: 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal\n  ✓ Реестры загружены — registry_sources=806; dict_countries=35; registry_connectors=24; ai_providers=18\n  ✓ Ресурсы интерфейса на месте — проверено 9\n  ✓ Маршруты API зарегистрированы — 97 маршрутов\n  ✓ Подсистемы отвечают — api=ok (0.004 мс); database=ok (62.861 мс); storage=ok (3.612 мс)\nЖурнал загрузки: C:\\users\\root\\AppData\\Local\\IsheikaNTR-AI\\boot-log.txt\nДиагностика в браузере: http://127.0.0.1:8021/api/v1/boot-log\n",
+    "log_tail": "  ✓ База данных и миграции — 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal, 0007_translation, 0008_idempotency\n  ✓ Реестры источников и методик — источников 806, стран 35, коннекторов 24\n  ✓ Обработчики этапов — workflow.pipeline импортирован\n  ✓ Ресурсы интерфейса — проверено 9\n  ✓ Маршруты API — 100 маршрутов\n  ✓ Привязка порта — 127.0.0.1:8021\n  ✓ Планировщик самопроверок — шаг 60 с\n  ✓ Каталог данных доступен на запись — C:\\users\\root\\AppData\\Local\\IsheikaNTR-AI\n  ✓ База данных целостна — quick_check=ok; миграции: 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal, 0007_translation, 0008_idempotency\n  ✓ Реестры загружены — registry_sources=806; dict_countries=35; registry_connectors=24; ai_providers=18\n  ✓ Ресурсы интерфейса на месте — проверено 9\n  ✓ Маршруты API зарегистрированы — 100 маршрутов\n  ✓ Доверенные сертификаты на месте — корней всего 153; системных 153; в наборе приложения 150\n  ✓ Подсистемы отвечают — api=ok (0.018 мс); database=ok (19.721 мс); storage=ok (3.219 мс)\nЖурнал загрузки: C:\\users\\root\\AppData\\Local\\IsheikaNTR-AI\\boot-log.txt\nДиагностика в браузере: http://127.0.0.1:8021/api/v1/boot-log\n",
     "ok": true
   },
   "wine_tests": {
@@ -179,7 +179,7 @@
     "returncode": 0,
     "tail": [
       "----------------------------------------------------------------------",
-      "Ran 206 tests in 21.006s",
+      "Ran 248 tests in 29.970s",
       "",
       "OK"
     ],
@@ -219,7 +219,7 @@
       },
       {
         "asset": "screens_core.js",
-        "bytes": 94006,
+        "bytes": 98227,
         "ctype": "application/javascript; charset=utf-8",
         "identical_to_source": true,
         "ctype_ok": true,
@@ -259,7 +259,7 @@
       },
       {
         "asset": "app.js",
-        "bytes": 53545,
+        "bytes": 56255,
         "ctype": "application/javascript; charset=utf-8",
         "identical_to_source": true,
         "ctype_ok": true,
@@ -272,15 +272,15 @@
     "assets_ok": 9,
     "assets_total": 9,
     "boot_log_ok": true,
-    "boot_checks": 6,
-    "app_version": "1.4.2",
+    "boot_checks": 7,
+    "app_version": "1.5.1",
     "missing_asset_status": 404,
-    "log_tail": "ТР AI · профиль DEV · http://127.0.0.1:8031/\nЗагрузка boot-59b8ac94-91c3-4305-8980-bf2f2e7dc7d6: исправно\n  ✓ Конфигурация — профиль DEV, сеть выкл, платный ИИ запрещён\n  ✓ Каталоги данных\n  ✓ База данных и миграции — 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal\n  ✓ Реестры источников и методик — источников 806, стран 35, коннекторов 24\n  ✓ Обработчики этапов — workflow.pipeline импортирован\n  ✓ Ресурсы интерфейса — проверено 9\n  ✓ Маршруты API — 97 маршрутов\n  ✓ Привязка порта — 127.0.0.1:8031\n  ✓ Планировщик самопроверок — шаг 60 с\n  ✓ Каталог данных доступен на запись — /tmp/isheika-linux-data-0rzx0ut9\n  ✓ База данных целостна — quick_check=ok; миграции: 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal\n  ✓ Реестры загружены — registry_sources=806; dict_countries=35; registry_connectors=24; ai_providers=18\n  ✓ Ресурсы интерфейса на месте — проверено 9\n  ✓ Маршруты API зарегистрированы — 97 маршрутов\n  ✓ Подсистемы отвечают — api=ok (0.003 мс); database=ok (9.95 мс); storage=ok (0.483 мс)\nЖурнал загрузки: /tmp/isheika-linux-data-0rzx0ut9/boot-log.txt\nДиагностика в браузере: http://127.0.0.1:8031/api/v1/boot-log\n",
+    "log_tail": " ✓ Каталоги данных\n  ✓ База данных и миграции — 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal, 0007_translation, 0008_idempotency\n  ✓ Реестры источников и методик — источников 806, стран 35, коннекторов 24\n  ✓ Обработчики этапов — workflow.pipeline импортирован\n  ✓ Ресурсы интерфейса — проверено 9\n  ✓ Маршруты API — 100 маршрутов\n  ✓ Привязка порта — 127.0.0.1:8031\n  ✓ Планировщик самопроверок — шаг 60 с\n  ✓ Каталог данных доступен на запись — /tmp/isheika-linux-data-1v1r1jqs\n  ✓ База данных целостна — quick_check=ok; миграции: 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal, 0007_translation, 0008_idempotency\n  ✓ Реестры загружены — registry_sources=806; dict_countries=35; registry_connectors=24; ai_providers=18\n  ✓ Ресурсы интерфейса на месте — проверено 9\n  ✓ Маршруты API зарегистрированы — 100 маршрутов\n  ✓ Доверенные сертификаты на месте — корней всего 150; системных 150; в наборе приложения 150\n  ✓ Подсистемы отвечают — api=ok (0.011 мс); database=ok (3.182 мс); storage=ok (0.202 мс)\nЖурнал загрузки: /tmp/isheika-linux-data-1v1r1jqs/boot-log.txt\nДиагностика в браузере: http://127.0.0.1:8031/api/v1/boot-log\n",
     "unit_tests": {
       "returncode": 0,
       "tail": [
         "----------------------------------------------------------------------",
-        "Ran 206 tests in 7.064s",
+        "Ran 248 tests in 10.957s",
         "",
         "OK"
       ],

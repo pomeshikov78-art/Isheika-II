@@ -43,7 +43,15 @@ const App = (() => {
          перерисовывается сам;
        * события журнала, не доставленные во время отказа, ждут в localStorage
          и досылаются после восстановления (раньше они терялись навсегда). */
-  const NET = {tries: 0, probe: null, delay: 4000, wasOffline: false, lastError: ''};
+  const NET = {tries: 0, probe: null, delay: 4000, wasOffline: false, lastError: '', unloading: false};
+  /* ИД-21: при перезагрузке/закрытии вкладки браузер отменяет все незавершённые
+     запросы. Раньше каждая отмена попадала в журнал как «Сервер недоступен»
+     (E_NETWORK) и переводила приложение в offline — выгрузка журнала с машины
+     пользователя содержала ~50 таких ложных отказов за одну секунду, при том что
+     сервер в ту же секунду отвечал на POST /journal/client за 0.2 мс. */
+  window.addEventListener('pagehide', () => { NET.unloading = true; });
+  window.addEventListener('beforeunload', () => { NET.unloading = true; });
+  window.addEventListener('pageshow', () => { NET.unloading = false; });
   const QUEUE_KEY = 'isheika.journal.queue';
   const QUEUE_MAX = 50;
   const queueRead = () => { try { return JSON.parse(store.get(QUEUE_KEY) || '[]') || []; } catch (e) { return []; } };
@@ -132,14 +140,26 @@ const App = (() => {
       if (attempt > 1) await sleep(600 * (attempt - 1) * (attempt - 1) + Math.round(Math.random() * 250));
       let res;
       const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      const timer = ctrl ? setTimeout(() => ctrl.abort(), limit) : null;
+      let timedOut = false;
+      const timer = ctrl ? setTimeout(() => { timedOut = true; ctrl.abort(); }, limit) : null;
       try {
         res = await fetch(url.toString(), Object.assign({}, req, {signal: ctrl ? ctrl.signal : undefined}));
       } catch (e) {
-        const timedOut = ctrl && ctrl.signal.aborted;
+        // ИД-21: отмена запроса — НЕ недоступность сервера. Отмену отличаем по
+        // признаку AbortError и по тому, кто её вызвал: наш таймер (timedOut) —
+        // это отказ ответа, выгрузка страницы или внешний abort — нет.
+        const aborted = (e && e.name === 'AbortError') || (ctrl && ctrl.signal.aborted);
+        if (aborted && !timedOut) {
+          if (timer) clearTimeout(timer);
+          throw {code: 'E_ABORTED', aborted: true, request_id: rid,
+                 message: NET.unloading ? 'Запрос отменён: страница закрывается или перезагружается'
+                                      : 'Запрос отменён (переход на другой экран)'};
+        }
+        const offlineByBrowser = typeof navigator !== 'undefined' && navigator.onLine === false;
         netErr = {code: 'E_NETWORK',
                message: timedOut ? 'Сервер не ответил за ' + Math.round(limit / 1000) + ' с: ' + path
-                                 : 'Сервер недоступен. Проверьте соединение — данные могли устареть.',
+                                 : (offlineByBrowser ? 'Браузер сообщает об отсутствии сети: ' + path
+                                                     : 'Сервер недоступен. Проверьте соединение — данные могли устареть.'),
                request_id: rid, offline: true, attempts: attempt};
         markOffline(netErr.message);
         continue;
@@ -168,6 +188,7 @@ const App = (() => {
       return data;
     }
     netErr = netErr || {code: 'E_NETWORK', message: 'Сервер недоступен: ' + path, request_id: rid, offline: true};
+    if (NET.unloading) throw netErr;      // ИД-21: выгрузка страницы — не отказ сервера
     reportClient({action: 'api.' + method + ' ' + path, message: netErr.message, code: 'E_NETWORK',
                   type: netErr.http ? 'GatewayError' : 'NetworkError',
                   detail: {http: netErr.http || 0, attempts: netErr.attempts || attempts, request_id: rid}});
@@ -280,6 +301,8 @@ const App = (() => {
 
   function errorBlock(e, ctx = {}) {
     const code = e && e.code || 'E_INTERNAL';
+    // ИД-21: отменённый запрос (переход/перезагрузка) — не ошибка экрана.
+    if (code === 'E_ABORTED') return '';
     const msg = e && e.message || String(e);
     const extra = [ctx.stage ? 'этап: ' + esc(ctx.stage) : '', ctx.task ? 'task_id: <code>' + esc(ctx.task) + '</code>' : '',
       e && e.request_id ? 'request_id: <code>' + esc(e.request_id) + '</code>' : ''].filter(Boolean).join(' · ');
@@ -714,6 +737,13 @@ const App = (() => {
     return el;
   }
 
+  function tlsLine(srv) {
+    const t = srv && srv.tls;
+    if (!t || t.error) return '—';
+    const extra = t.extra_bundle ? ' + свой набор оператора' : '';
+    return `${t.total_anchors} корней (системных ${t.system_anchors}, приложения ${t.bundled_certs})${extra}`;
+  }
+
   async function bootLogModal() {
     const b = boot();
     let srv = null;
@@ -728,7 +758,8 @@ const App = (() => {
       ${alertBox(srv && srv.ok ? 'ok' : 'error', srv && srv.ok ? 'Запуск исправен: все проверки пройдены.' : 'Есть отказы — см. строки ниже. Журнал можно скачать и приложить к обращению.')}
       ${kv({'Запуск': esc(srv && srv.boot_id || '—'), 'Версия': esc(srv && srv.app_version || '—'),
             'Профиль': esc(srv && srv.profile || '—'), 'Python': esc(srv && srv.python || '—'),
-            'Платформа': esc(srv && srv.platform || '—'), 'Каталог данных': esc(srv && srv.data_dir || '—')})}
+            'Платформа': esc(srv && srv.platform || '—'), 'Каталог данных': esc(srv && srv.data_dir || '—'),
+            'Доверие сертификатам': esc(tlsLine(srv))})}
       <h3>Шаги запуска сервера</h3><table class="tbl">${rows || '<tr><td>нет данных</td></tr>'}</table>
       <h3>Самопроверка</h3><table class="tbl">${checks || '<tr><td>нет данных</td></tr>'}</table>
       <h3>Ресурсы интерфейса</h3><table class="tbl">${assets || '<tr><td>нет данных</td></tr>'}</table>

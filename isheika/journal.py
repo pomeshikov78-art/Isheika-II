@@ -322,14 +322,23 @@ def export(fmt: str = "txt", *, limit: int = 5000, **filters) -> str:
         import io
         buf = io.StringIO()
         w = csv.writer(buf)
-        w.writerow(["at", "level", "kind", "source", "action", "actor", "role", "outcome",
-                    "http_status", "duration_ms", "error_code", "error_type", "research_id",
-                    "entity_kind", "entity_id", "request_id", "correlation_id", "fingerprint", "message"])
+        cols = ["at", "level", "kind", "source", "action", "actor", "role", "outcome",
+                "http_status", "duration_ms", "error_code", "error_type", "research_id",
+                "entity_kind", "entity_id", "request_id", "correlation_id", "fingerprint", "message",
+                # ИД-23: без деталей клиентских событий выгрузку нельзя разобрать —
+                # не видно версию приложения, экран, число попыток и задержку очереди.
+                "app_version", "screen", "route", "viewport", "boot_id", "queued_at",
+                "delivered_with_delay", "detail", "client"]
+        w.writerow(cols)
         for r in rows:
-            w.writerow([r.get(k) for k in ("at", "level", "kind", "source", "action", "actor", "role",
-                                           "outcome", "http_status", "duration_ms", "error_code",
-                                           "error_type", "research_id", "entity_kind", "entity_id",
-                                           "request_id", "correlation_id", "fingerprint", "message")])
+            client = r.get("client") or {}
+            row = [r.get(k) for k in cols[:19]]
+            row += [client.get("app_version"), client.get("screen"), client.get("route"),
+                    client.get("viewport"), r.get("boot_id") or client.get("boot_id"),
+                    client.get("queued_at"), client.get("delivered_with_delay"),
+                    json.dumps(r.get("detail") or {}, ensure_ascii=False, default=str),
+                    json.dumps(client, ensure_ascii=False, default=str)]
+            w.writerow(row)
         return buf.getvalue()
     lines = [f"ИЩЕЙКА НТР AI — журнал действий (записей: {len(rows)} из {data['total']})",
              f"Политика хранения: {SETTINGS.journal_retention_days} сут., не более {SETTINGS.journal_max_rows} записей",
@@ -344,11 +353,33 @@ def export(fmt: str = "txt", *, limit: int = 5000, **filters) -> str:
             extra.append(f"{r['duration_ms']} мс")
         if r.get("error_code"):
             extra.append(r["error_code"])
+        if r.get("error_type"):
+            extra.append(r["error_type"])
+        rid = r.get("request_id") or (r.get("detail") or {}).get("request_id")
+        if rid:
+            extra.append("rid=" + str(rid))
         if r.get("correlation_id"):
             extra.append("cid=" + r["correlation_id"])
         lines.append(head + ("  [" + ", ".join(extra) + "]" if extra else ""))
         if r.get("message"):
             lines.append("    " + r["message"])
+        # ИД-23: контекст события браузера и подробности — в текстовой выгрузке.
+        client = r.get("client") or {}
+        ctx = []
+        if client.get("app_version"):
+            ctx.append("версия " + str(client["app_version"]))
+        if client.get("screen"):
+            ctx.append("экран " + str(client["screen"]))
+        if client.get("route"):
+            ctx.append("маршрут " + str(client["route"]))
+        if client.get("viewport"):
+            ctx.append("окно " + str(client["viewport"]))
+        if client.get("queued_at"):
+            ctx.append("в очереди с " + str(client["queued_at"]) + " (доставлено с задержкой)")
+        if ctx:
+            lines.append("    " + " · ".join(ctx))
+        if r.get("detail"):
+            lines.append("    детали: " + json.dumps(r["detail"], ensure_ascii=False, default=str)[:1200])
         if r.get("stack"):
             lines += ["    " + s for s in r["stack"].splitlines()[-12:]]
     return "\n".join(lines) + "\n"

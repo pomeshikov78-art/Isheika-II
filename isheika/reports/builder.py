@@ -48,6 +48,20 @@ def collect(research_id: str) -> dict:
                                          AND s2.research_id=d.research_id
                                          ORDER BY s2.created_at DESC, s2.rowid DESC LIMIT 1)
                         WHERE d.research_id=? ORDER BY d.relevance_score DESC""", (research_id,))]
+    # Технический перевод найденной НТИ (ред. 1.5.0): русский текст рядом с оригиналом
+    from .. import translation as TRANSL
+    trans = {t["document_id"]: t for t in
+             [db.dec(x, "untranslated") for x in
+              db.query("""SELECT t.* FROM document_translations t
+                          JOIN content_occurrences o ON o.document_id=t.document_id
+                          WHERE o.research_id=?""", (research_id,))]}
+    for d in docs:
+        t = trans.get(d["id"]) or {}
+        d["title_ru"] = t.get("title_ru") or d["title"]
+        d["abstract_ru"] = t.get("abstract_ru") or d.get("abstract") or ""
+        d["translation_mode"] = t.get("mode") or "нет"
+        d["translation_coverage"] = t.get("coverage")
+        d["translation_review"] = bool(t.get("review_required"))
     jobs = [db.dec(x, "depends_on", "result") for x in
             db.query("SELECT * FROM workflow_jobs WHERE research_id=? ORDER BY created_at", (research_id,))]
     sjobs = db.query("SELECT * FROM search_jobs WHERE research_id=?", (research_id,))
@@ -60,7 +74,7 @@ def collect(research_id: str) -> dict:
         "alternatives": [db.dec(x, "criteria") for x in db.query("SELECT * FROM analytics_alternatives WHERE research_id=?", (research_id,))],
         "forecast": db.dec(db.one("SELECT * FROM forecast_runs WHERE research_id=? ORDER BY created_at DESC LIMIT 1", (research_id,)), "horizons", "scenarios", "assumptions", "intervals"),
         "trends": TR.latest(research_id),
-        "evidence": E.evidence_for(research_id),
+        "evidence": _with_quote_translation(E.evidence_for(research_id)),
         "evidence_summary": E.summary(research_id),
         "claims": db.query("SELECT * FROM knowledge_claims WHERE research_id=?", (research_id,)),
         "coverage": SM.coverage_by_country(research_id),
@@ -70,9 +84,28 @@ def collect(research_id: str) -> dict:
         "ai_requests": db.query("SELECT * FROM ai_requests WHERE research_id=? ORDER BY created_at", (research_id,)),
         "methodology": methodology(),
         "methodology_registry": M.used_in_research(research_id),   # ИД-09: версии из реестра
+        "translation": TRANSL.summary(research_id),
         "generated_at": iso_now(),
         "api_version": "v1", "app_version": APP_VERSION,
     }
+
+
+
+def _with_quote_translation(items: list[dict]) -> list[dict]:
+    """Русский перевод цитат доказательств (ред. 1.5.0): оригинал сохраняется рядом."""
+    from .. import translation as TRANSL
+    for e in items:
+        quote = e.get("quote") or ""
+        if not quote:
+            e["quote_ru"], e["quote_mode"] = "", "нет"
+            continue
+        if TRANSL.detect_language(quote) == "ru":
+            e["quote_ru"], e["quote_mode"] = quote, "original"
+            continue
+        t = TRANSL.translate_text(quote[:1200])
+        e["quote_ru"], e["quote_mode"] = t["text"], t["mode"]
+        e["quote_coverage"] = t["coverage"]
+    return items
 
 
 def warnings(data: dict) -> list[str]:
@@ -117,13 +150,30 @@ def build_html(data: dict) -> str:
 
     docs_rows = []
     for d in data["documents"][:200]:
+        ru = d.get("title_ru") or d["title"]
+        original = d["title"] if ru != d["title"] else ""
+        mark = {"terminology": "терминологический перевод", "ai_technical": "перевод ИИ",
+                "original": "оригинал на русском"}.get(d.get("translation_mode"), "")
+        cell = f'<a href="{esc(d["url"])}">{esc(ru[:160])}</a>'
+        if original:
+            cell += (f'<div class="tiny muted">{esc(original[:160])}'
+                     + (f' · {esc(mark)}' if mark else "") + "</div>")
         docs_rows.append([
-            f'<a href="{esc(d["url"])}">{esc(d["title"][:120])}</a>',
+            cell,
             esc(d["doc_type"]), esc(d["source_code"]), esc(d["country_code"] or "—"),
             esc((d["published_at"] or "")[:10]), f'{(d.get("score") or 0):.2f}',
             esc(d.get("rclass") or "—"), esc(d["evidence_class"]),
         ])
-    ev_rows = [[esc(e["quote"] or "")[:200], f'<a href="{esc(e["url"] or "")}">источник</a>',
+    trn_rows = []
+    for mode, info in ((data.get("translation") or {}).get("modes") or {}).items():
+        name = {"original": "оригинал на русском", "terminology": "терминологический перевод (черновик)",
+                "ai_technical": "перевод моделью ИИ"}.get(mode, mode)
+        trn_rows.append([esc(name), str(info["count"]), f'{info["coverage"]}'])
+    ev_rows = [[(esc((e.get("quote_ru") or e["quote"] or ""))[:240]
+                 + (f'<div class="tiny muted">{esc((e["quote"] or "")[:200])}'
+                    + (" · терминологический перевод" if e.get("quote_mode") == "terminology" else "")
+                    + "</div>" if e.get("quote_mode") == "terminology" else "")),
+                f'<a href="{esc(e["url"] or "")}">источник</a>',
                 esc(e["evidence_class"]), esc(e["status"]), f'{(e["quality"] or 0):.2f}',
                 esc(e["locator"] or "")] for e in data["evidence"][:120]]
     trl_rows = [[str(c["level"]), esc(c["criterion_id"]), esc(c["text"]),
@@ -253,10 +303,21 @@ def build_html(data: dict) -> str:
 <h2>16. Карта пробелов по странам</h2>
 {table(["Страна", "ISO", "Документов", "Класс П", "Статус"], cov_rows)}
 
-<h2>17. Ограничения</h2>
+<h2>17. Технический перевод найденных материалов</h2>
+<p class="meta">Переведено материалов: {(data.get('translation') or {}).get('translated', 0)};
+требуют вычитки: {(data.get('translation') or {}).get('review_required', 0)};
+словарь терминов <code>{esc((data.get('translation') or {}).get('glossary_version') or '—')}</code>.
+Терминологический режим — черновик технического перевода: числа, единицы измерения,
+обозначения и идентификаторы сохранены, формулировки требуют вычитки специалистом.</p>
+{table(["Режим перевода", "Материалов", "Доля переведённого"], trn_rows)}
+
+<h2>Приложение А. Найденные материалы (русский перевод и оригинал)</h2>
+{table(["Название", "Тип", "Источник", "Страна", "Дата", "R", "Класс R", "Класс доказательства"], docs_rows)}
+
+<h2>18. Ограничения</h2>
 <ul>{''.join(f'<li>{esc(x)}</li>' for x in (pp.get('limitations') or []))}</ul>
 
-<h2>18. Выводы</h2>
+<h2>19. Выводы</h2>
 <p>Отчёт сформирован автоматически по открытым источникам. Численные оценки получены расчётным ядром
 с версией методики {esc(data['methodology']['version'])}; утверждения разделены на FACT / ANALYSIS / HYPOTHESIS / FORECAST.
 Незавершённая калибровка означает, что абсолютные значения оценок следует трактовать как ориентировочные.</p>
@@ -268,19 +329,24 @@ def build_csv(data: dict, kind: str = "documents") -> str:
     buf = io.StringIO()
     w = csv.writer(buf)
     if kind == "evidence":
-        w.writerow(["claim_id", "document_id", "url", "locator", "quote", "evidence_class", "status", "quality", "published_at", "accessed_at"])
+        w.writerow(["claim_id", "document_id", "url", "locator", "quote_ru", "quote_original", "quote_mode",
+                    "evidence_class", "status", "quality", "published_at", "accessed_at"])
         for e in data["evidence"]:
-            w.writerow([e["claim_id"], e["document_id"], e["url"], e["locator"], e["quote"],
+            w.writerow([e["claim_id"], e["document_id"], e["url"], e["locator"],
+                        e.get("quote_ru") or e["quote"], e["quote"], e.get("quote_mode") or "",
                         e["evidence_class"], e["status"], e["quality"], e["published_at"], e["accessed_at"]])
     elif kind == "claims":
         w.writerow(["claim_id", "type", "status", "confidence", "text", "produced_by"])
         for c in data["claims"]:
             w.writerow([c["id"], c["claim_type"], c["status"], c["confidence"], c["claim_text"], c["produced_by"]])
     else:
-        w.writerow(["document_id", "title", "url", "type", "source", "country", "language",
+        w.writerow(["document_id", "title_ru", "abstract_ru", "translation_mode", "translation_coverage",
+                    "title_original", "url", "type", "source", "country", "language",
                     "published_at", "relevance", "class", "evidence_class", "marker", "doi"])
         for d in data["documents"]:
-            w.writerow([d["id"], d["title"], d["url"], d["doc_type"], d["source_code"], d["country_code"],
+            w.writerow([d["id"], d.get("title_ru") or d["title"], d.get("abstract_ru") or "",
+                        d.get("translation_mode") or "", d.get("translation_coverage"),
+                        d["title"], d["url"], d["doc_type"], d["source_code"], d["country_code"],
                         d["language"], d["published_at"], d.get("score"), d.get("rclass"),
                         d["evidence_class"], d["marker"], d["doi"]])
     return buf.getvalue()
@@ -312,8 +378,11 @@ def _col(n: int) -> str:
 
 def build_xlsx(data: dict, path: str) -> str:
     sheets = {
-        "Документы": [["ID", "Заголовок", "URL", "Тип", "Источник", "Страна", "Дата", "R", "Класс", "Класс доказательства"]] +
-                     [[d["id"], d["title"], d["url"], d["doc_type"], d["source_code"], d["country_code"],
+        "Документы": [["ID", "Заголовок (рус.)", "Аннотация (рус.)", "Режим перевода", "Доля перевода",
+                       "Заголовок (оригинал)", "URL", "Тип", "Источник", "Страна", "Дата", "R", "Класс", "Класс доказательства"]] +
+                     [[d["id"], d.get("title_ru") or d["title"], (d.get("abstract_ru") or "")[:2000],
+                       d.get("translation_mode") or "", d.get("translation_coverage"),
+                       d["title"], d["url"], d["doc_type"], d["source_code"], d["country_code"],
                        d["published_at"], d.get("score"), d.get("rclass"), d["evidence_class"]] for d in data["documents"]],
         "TRL": [["Уровень", "Критерий", "Формулировка", "Подтверждено", "Классы"]] +
                [[c["level"], c["criterion_id"], c["text"], "да" if c["confirmed"] else "нет",
@@ -321,8 +390,9 @@ def build_xlsx(data: dict, path: str) -> str:
         "Реализуемость": [["Фактор", "Вес", "x", "Статус", "Обоснование"]] +
                          [[f["name"], f["weight"], f.get("x"), f["assessment"], f.get("rationale")]
                           for f in ((data["feasibility"] or {}).get("factors") or [])],
-        "Доказательства": [["Claim", "URL", "Фрагмент", "Класс", "Статус", "Качество"]] +
-                          [[e["claim_id"], e["url"], e["quote"], e["evidence_class"], e["status"], e["quality"]]
+        "Доказательства": [["Claim", "URL", "Фрагмент (рус.)", "Фрагмент (оригинал)", "Класс", "Статус", "Качество"]] +
+                          [[e["claim_id"], e["url"], e.get("quote_ru") or e["quote"], e["quote"],
+                            e["evidence_class"], e["status"], e["quality"]]
                            for e in data["evidence"]],
         "Покрытие": [["Страна", "ISO", "Документов", "Класс П", "Пробел"]] +
                     [[c["name_ru"], c["iso2"], c["documents"], c["class_P"], "да" if c["gap"] else "нет"] for c in data["coverage"]],
@@ -388,8 +458,25 @@ def build_docx(data: dict, path: str) -> str:
                             f'{"неизвестно" if f.get("x") is None else f["x"]} — {f.get("rationale","")}'))
     blocks.append(("h2", "6. Доказательства (выборка)"))
     for e in data["evidence"][:40]:
-        blocks.append(("p", f'[{e["evidence_class"]}/{e["status"]}] {(e["quote"] or "")[:220]} — {e["url"]}'))
-    blocks.append(("h2", "7. Ограничения"))
+        blocks.append(("p", f'[{e["evidence_class"]}/{e["status"]}] {(e.get("quote_ru") or e["quote"] or "")[:220]} — {e["url"]}'))
+        if e.get("quote_mode") == "terminology":
+            blocks.append(("p", f'   оригинал: {(e["quote"] or "")[:200]}'))
+    trn = data.get("translation") or {}
+    blocks.append(("h2", "7. Технический перевод найденных материалов"))
+    blocks.append(("p", f'Переведено материалов: {trn.get("translated", 0)}; '
+                        f'требуют вычитки: {trn.get("review_required", 0)}; '
+                        f'словарь терминов {trn.get("glossary_version", "—")}'))
+    for mode, info in (trn.get("modes") or {}).items():
+        name = {"original": "оригинал на русском", "terminology": "терминологический перевод (черновик)",
+                "ai_technical": "перевод моделью ИИ"}.get(mode, mode)
+        blocks.append(("p", f'• {name}: {info["count"]}, доля переведённого {info["coverage"]}'))
+    for d in data["documents"][:25]:
+        if (d.get("title_ru") or d["title"]) != d["title"]:
+            blocks.append(("p", f'{d["title_ru"]}'))
+            blocks.append(("p", f'   оригинал: {d["title"]}'))
+            if d.get("abstract_ru"):
+                blocks.append(("p", f'   {d["abstract_ru"][:600]}'))
+    blocks.append(("h2", "8. Ограничения"))
     for lim in ((data["passport"] or {}).get("passport") or {}).get("limitations", []):
         blocks.append(("p", "• " + lim))
 

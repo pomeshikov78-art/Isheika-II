@@ -15,15 +15,16 @@ import threading
 import time
 
 from isheika import slo
+from isheika.contracts import new_id
 from isheika.storage import db
 from isheika.workflow import engine as W, pipeline as P
 from tests.base import BaseCase
 
 
-def run_offline(case: BaseCase, **settings) -> str:
+def run_offline(case: BaseCase, query: str | None = None, **settings) -> str:
     s = {"connector_codes": ["CON-SIM"], "max_docs_per_source": 3}
     s.update(settings)
-    rid = case.make_research(settings=s)
+    rid = case.make_research(query or "тропосферная связь за горизонтом", settings=s)
     W.start(rid)
     deadline = time.time() + 120
     while time.time() < deadline:
@@ -105,8 +106,11 @@ class ResumeContextTests(BaseCase):
 class DedupSummaryTests(BaseCase):
     def test_RES_06_summary_separates_new_and_already_known(self):
         """RES-06: «дубли» корпуса не выдаются за дубли исследования — сводка честна."""
-        rid1 = run_offline(self, query="6G терагерцовая связь")
-        rid2 = run_offline(self, query="6G терагерцовая связь")
+        # запрос уникален для испытания: корпус общий для всех исследований,
+        # и посевы других испытаний не должны делать «первый запуск» повторным
+        q = "6G терагерцовая связь " + new_id("q")[2:8]
+        rid1 = run_offline(self, query=q)
+        rid2 = run_offline(self, query=q)
         j1 = db.dec(job_of(rid1, "document_processing"), "result")["result"]
         j2 = db.dec(job_of(rid2, "document_processing"), "result")["result"]
         for res in (j1, j2):

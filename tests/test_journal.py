@@ -233,7 +233,7 @@ class JournalTests(BaseCase):
         h.qs, h.session, h.client_address = {}, {"login": "analyst", "role": "analyst"}, ("127.0.0.1", 1)
         h.headers = {"User-Agent": "TestClient/1.0"}
         h._journal_request("POST", 7.5)
-        row = db.one("SELECT * FROM ops_journal WHERE action='POST /api/v1/researches' ORDER BY at DESC LIMIT 1")
+        row = db.one("SELECT * FROM ops_journal WHERE action='POST /api/v1/researches' ORDER BY rowid DESC LIMIT 1")
         self.assertEqual(row["kind"], "api")
         self.assertEqual(row["level"], "warn")
         self.assertEqual(row["http_status"], 422)

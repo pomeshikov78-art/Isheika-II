@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import sqlite3
 import unicodedata
 from urllib.parse import urlparse
 
@@ -88,6 +89,24 @@ def version_key(doc: Document, base: str | None = None) -> str:
     return base + "|" + suffix
 
 
+def _insert_idempotent(table: str, data: dict, lookup_sql: str, params: tuple) -> tuple[str, bool]:
+    """Вставка, устойчивая к гонке параллельных потоков поиска (ИД-20).
+
+    Проверка «есть ли запись» и вставка не атомарны: две ветви одного источника
+    обрабатывают один и тот же материал одновременно. Нарушение UNIQUE означает,
+    что запись уже создана соседним потоком, — переиспользуем её, а не роняем
+    весь источник в failed (что делало этап partial и тянуло пересчёт по ИД-17).
+    """
+    try:
+        db.insert(table, data)
+        return data["id"], True
+    except sqlite3.IntegrityError:
+        row = db.one(lookup_sql, params)
+        if row is None:
+            raise
+        return row["id"], False
+
+
 def blob_of(doc: Document) -> tuple[str, str]:
     """Физическое содержимое: SHA-256 текста представления документа."""
     text = "\n".join([doc.title or "", doc.abstract or "", doc.text_excerpt or ""])
@@ -96,10 +115,11 @@ def blob_of(doc: Document) -> tuple[str, str]:
     if row:
         return row["id"], sha
     bid = new_id("blb-")
-    db.insert("content_blobs", {
+    bid, _ = _insert_idempotent("content_blobs", {
         "id": bid, "content_sha256": sha, "hash_algorithm": "sha256",
         "size_bytes": len(text.encode("utf-8")), "format": "text/plain",
-        "text_ref": doc.raw_ref, "storage_ref": None, "created_at": iso_now()})
+        "text_ref": doc.raw_ref, "storage_ref": None, "created_at": iso_now()},
+        "SELECT id FROM content_blobs WHERE content_sha256=?", (sha,))
     return bid, sha
 
 
@@ -231,7 +251,7 @@ def store(research_id: str, doc: Document, *, search_job_id: str | None = None,
 
     if existing is None:
         doc_id = doc.document_id or new_id("doc-")
-        db.insert("content_documents", {
+        doc_id, _inserted = _insert_idempotent("content_documents", {
             "id": doc_id, "logical_key": key, "blob_id": blob_id, "cluster_id": None,
             "title": doc.title, "normalized_title": normalized_title(doc.title),
             "doc_type": doc.doc_type, "authors": doc.authors, "organizations": doc.organizations,
@@ -244,8 +264,14 @@ def store(research_id: str, doc: Document, *, search_job_id: str | None = None,
             "duplicate_of_document_id": None, "evidence_class": doc.evidence_class,
             "independence_group": doc.independence_group,
             "origin_class": origin_class_of(doc), "marker": doc.marker,
-            "first_research_id": research_id, "created_at": now, "updated_at": now})
+            "first_research_id": research_id, "created_at": now, "updated_at": now},
+            "SELECT id FROM content_documents WHERE logical_key=?", (key,))
         dedup_status = "UNIQUE"
+        if not _inserted:
+            is_new = False
+            dedup_status = "DUPLICATE"
+            db.update("content_documents", "id", doc_id,
+                      {"deduplication_status": "DUPLICATE", "updated_at": now})
     else:
         doc_id = existing["id"]
         old_view = db.one("""SELECT d.*, o.url FROM content_documents d
@@ -265,10 +291,11 @@ def store(research_id: str, doc: Document, *, search_job_id: str | None = None,
             cluster_id = db.one("SELECT cluster_id FROM content_documents WHERE id=?", (doc_id,))["cluster_id"]
             if relation == "ALTERNATIVE_HOSTING" and not cluster_id:
                 cluster_id = new_id("cls-")
-                db.insert("content_clusters", {
+                cluster_id, _ = _insert_idempotent("content_clusters", {
                     "id": cluster_id, "cluster_key": "cluster:" + doc_id,
                     "title": (old_view.get("title") or "")[:200], "cluster_type": "ALTERNATIVE_HOSTING",
-                    "primary_document_id": doc_id, "created_at": now})
+                    "primary_document_id": doc_id, "created_at": now},
+                    "SELECT id FROM content_clusters WHERE cluster_key=?", ("cluster:" + doc_id,))
                 db.upsert("content_cluster_members", {
                     "cluster_id": cluster_id, "document_id": doc_id, "relation": "ALTERNATIVE_HOSTING",
                     "role": "primary", "confidence": rel_conf, "decided_by": "algorithm",
@@ -277,7 +304,7 @@ def store(research_id: str, doc: Document, *, search_job_id: str | None = None,
         else:
             # связанная версия: отдельный логический документ + связь + кластер
             doc_id = doc.document_id or new_id("doc-")
-            db.insert("content_documents", {
+            doc_id, _inserted = _insert_idempotent("content_documents", {
                 "id": doc_id, "logical_key": version_key(doc, key),
                 "blob_id": blob_id, "cluster_id": None, "title": doc.title,
                 "normalized_title": normalized_title(doc.title), "doc_type": doc.doc_type,
@@ -292,10 +319,11 @@ def store(research_id: str, doc: Document, *, search_job_id: str | None = None,
                 "duplicate_of_document_id": existing["id"], "evidence_class": doc.evidence_class,
                 "independence_group": doc.independence_group, "origin_class": origin_class_of(doc),
                 "marker": doc.marker, "first_research_id": research_id,
-                "created_at": now, "updated_at": now})
+                "created_at": now, "updated_at": now},
+                "SELECT id FROM content_documents WHERE logical_key=?", (version_key(doc, key),))
             cluster_id = _ensure_cluster(doc_id, existing["id"], relation, rel_conf, rel_basis)
             dedup_status = "CLUSTERED"
-            is_new = True
+            is_new = _inserted
 
     cu = norm.normalize_url(doc.url)
     occ = db.one("""SELECT id FROM content_occurrences
@@ -308,13 +336,18 @@ def store(research_id: str, doc: Document, *, search_job_id: str | None = None,
         new_occurrence = False
     else:
         occ_id = new_id("occ-")
-        db.insert("content_occurrences", {
+        occ_id, new_occurrence = _insert_idempotent("content_occurrences", {
             "id": occ_id, "document_id": doc_id, "research_id": research_id,
             "source_code": doc.source_code, "connector_code": doc.connector_code,
             "search_job_id": search_job_id, "branch": branch, "expression": expression,
             "url": doc.url, "canonical_url": cu, "accessed_at": doc.accessed_at,
-            "fetch_http_status": 200, "raw_ref": doc.raw_ref, "blob_id": blob_id, "created_at": now})
-        new_occurrence = True
+            "fetch_http_status": 200, "raw_ref": doc.raw_ref, "blob_id": blob_id, "created_at": now},
+            """SELECT id FROM content_occurrences
+               WHERE research_id=? AND source_code=? AND canonical_url=?""",
+            (research_id, doc.source_code, cu))
+        if not new_occurrence:
+            db.update("content_occurrences", "id", occ_id,
+                      {"accessed_at": doc.accessed_at, "fetch_http_status": 200, "blob_id": blob_id})
     return {"document_id": doc_id, "occurrence_id": occ_id, "new_document": is_new,
             "new_occurrence": new_occurrence, "deduplication_status": dedup_status,
             "relation": relation, "cluster_id": cluster_id, "match_basis": match_basis or basis,

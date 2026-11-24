@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 
 from . import journal
+from . import tls
 from .config import SETTINGS
 from .contracts import iso_now
 from .storage import db
@@ -335,6 +336,38 @@ def rule_journal(research_id=None) -> list[dict]:
     return out
 
 
+def rule_tls(research_id=None) -> list[dict]:
+    """DIA-20/21. Доверие TLS: отказы проверки сертификатов и отсутствие набора корней."""
+    out = []
+    scope, args = _scope(research_id)
+    rows = db.query(f"""SELECT id, at, action, research_id, message FROM ops_journal
+                        WHERE (message LIKE '%CERTIFICATE_VERIFY_FAILED%'
+                               OR detail LIKE '%CERTIFICATE_VERIFY_FAILED%'){scope}
+                        ORDER BY at DESC LIMIT 50""", args)
+    if rows:
+        info = tls.info()
+        out.append(_finding("DIA-20", "warn", "Источник не прошёл проверку сертификата",
+                            "Запрос к источнику оборван на проверке сертификата TLS: данные не получены, "
+                            "при этом сама сеть может быть исправна. Частая причина — корень удостоверяющего "
+                            "центра источника отсутствует в доверенных на этой машине.",
+                            len(rows),
+                            [{"journal_id": r["id"], "at": r["at"], "action": r["action"],
+                              "research_id": r["research_id"], "message": (r["message"] or "")[:160]}
+                             for r in rows] + [{"anchors": info.get("total_anchors"),
+                                                "bundled_certs": info.get("bundled_certs")}],
+                            "Проверить набор корней приложения (isheika/data/cacert.pem) и дату его снимка; "
+                            "для корпоративного прокси или своего УЦ указать файл в ISHEIKA_CA_BUNDLE. "
+                            "Отключать проверку сертификатов нельзя."))
+    if not os.path.isfile(tls.BUNDLE):
+        out.append(_finding("DIA-21", "error", "Набор корневых сертификатов не найден",
+                            "Приложение опирается только на доверие операционной системы. На Windows без "
+                            "обновлённых корней часть источников будет недоступна (так отказывал arXiv).",
+                            1, [{"expected": tls.BUNDLE}],
+                            "Восстановить файл isheika/data/cacert.pem из поставки или указать свой набор "
+                            "в ISHEIKA_CA_BUNDLE."))
+    return out
+
+
 def rule_methodology(research_id=None) -> list[dict]:
     """DIA-19. Версия методики в расчётах против реестра методик."""
     # В расчётах версия хранится в виде «CODE version» (см. analytics/snapshot.py),
@@ -376,6 +409,7 @@ RULES = [
     ("DIA-13/14", "Политика ИИ и квоты", "rule_policy"),
     ("DIA-15…18", "Дефекты по журналу", "rule_journal"),
     ("DIA-19", "Версии методик", "rule_methodology"),
+    ("DIA-20/21", "Доверие сертификатам источников", "rule_tls"),
 ]
 
 

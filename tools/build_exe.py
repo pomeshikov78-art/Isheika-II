@@ -257,7 +257,7 @@ def app_version() -> str:
         import isheika
         return isheika.__version__
     except Exception:
-        return "1.4.2"
+        return "1.5.0"
 
 
 def build(args) -> dict:

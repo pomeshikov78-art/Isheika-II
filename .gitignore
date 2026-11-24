@@ -10,5 +10,6 @@ node_modules/
 # журнал загрузки и вновь сформированные файлы отчётов не версионируются.
 var/boot-log.txt
 var/boot-log.json
+var/journal-fallback.log
 var/files/
 var/backups/

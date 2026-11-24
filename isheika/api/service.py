@@ -249,8 +249,10 @@ def list_documents(rid: str, *, cls: str | None = None, country: str | None = No
                    min_score: float | None = None, q: str | None = None,
                    limit: int = 100, offset: int = 0, sort: str = "score") -> dict:
     sql = """SELECT d.*, d.relevance_score AS score, d.relevance_class AS rclass,
-                    r.reason, r.components, r.reason_codes, r.methodology_version AS rel_methodology
+                    r.reason, r.components, r.reason_codes, r.methodology_version AS rel_methodology,
+                    t.title_ru, t.abstract_ru, t.mode AS translation_mode, t.coverage AS translation_coverage
              FROM research_documents d
+             LEFT JOIN document_translations t ON t.document_id=d.id AND t.lang_to='ru' 
              LEFT JOIN search_results r ON r.document_id=d.id AND r.research_id=d.research_id
                   AND r.id=(SELECT s2.id FROM search_results s2 WHERE s2.document_id=d.id
                             AND s2.research_id=d.research_id ORDER BY s2.created_at DESC, s2.rowid DESC LIMIT 1)
@@ -289,6 +291,8 @@ def get_document(did: str) -> dict:
                "authors", "organizations", "identifiers")
     if not d:
         raise CoreError("E_NOT_FOUND", "Документ не найден")
+    from .. import translation as TR
+    d["translation"] = TR.for_document(did)
     d["occurrences"] = db.query("SELECT * FROM content_occurrences WHERE document_id=? ORDER BY accessed_at", (did,))
     d["relations"] = db.query("SELECT * FROM content_relations WHERE from_document_id=? OR to_document_id=?", (did, did))
     d["relevance_by_research"] = [db.dec(x, "components", "weights", "reason_codes", "gate") for x in
@@ -1094,3 +1098,35 @@ def update_settings(body: dict, *, actor: str = "system") -> dict:
     SETTINGS.save()
     audit(actor, "settings.update", "settings", None, payload=changed)
     return {"changed": changed, "settings": SETTINGS.public_dict()}
+
+def document_translation(document_id: str) -> dict:
+    """Технический перевод документа на русский язык (или отметка «оригинал русский»)."""
+    from .. import translation as TR
+    d = db.one("SELECT id FROM content_documents WHERE id=?", (document_id,))
+    if not d:
+        raise CoreError("E_NOT_FOUND", "Документ не найден")
+    row = TR.for_document(document_id)
+    if not row:
+        doc = db.dec(db.one("SELECT * FROM content_documents WHERE id=?", (document_id,)), "identifiers")
+        row = TR.translate_document(doc)
+    original = db.one("SELECT title, abstract, language FROM content_documents WHERE id=?", (document_id,))
+    return {"translation": row, "original": original,
+            "note": "Терминологический режим — черновик технического перевода, требует вычитки."
+                    if row and row.get("mode") == "terminology" else ""}
+
+
+def translate_research(research_id: str, *, force: bool = False, actor: str = "system",
+                       limit: int | None = None) -> dict:
+    """Перевод материалов исследования на русский (повторно — с force)."""
+    from .. import translation as TR
+    r = db.one("SELECT id FROM core_researches WHERE id=?", (research_id,))
+    if not r:
+        raise CoreError("E_NOT_FOUND", "Исследование не найдено")
+    res = TR.run(research_id, force=force, limit=limit)
+    audit(actor, "research.translate", "research", research_id, research_id, {"force": force, **res})
+    return res
+
+
+def translation_summary(research_id: str) -> dict:
+    from .. import translation as TR
+    return TR.summary(research_id)

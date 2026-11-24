@@ -18,6 +18,25 @@ THESAURUS: dict[str, dict[str, list[str]]] = {
         "en": ["tropospheric scatter", "troposcatter", "tropospheric radio propagation", "beyond line of sight"],
         "abbr": ["TROS", "BLOS"],
     },
+    "mobile_generation": {
+        "ru": ["6G", "связь шестого поколения", "мобильная связь нового поколения", "IMT-2030"],
+        "en": ["6G", "sixth generation mobile", "IMT-2030", "next generation wireless"],
+        "abbr": ["6G", "IMT-2030"],
+    },
+    "terahertz": {
+        "ru": ["терагерцовый диапазон", "субтерагерцовая связь", "терагерцовая связь"],
+        "en": ["terahertz communication", "sub-THz", "THz band"], "abbr": ["THz"],
+    },
+    "ris": {
+        "ru": ["перенастраиваемая интеллектуальная поверхность", "метаповерхность"],
+        "en": ["reconfigurable intelligent surface", "intelligent reflecting surface", "metasurface"],
+        "abbr": ["RIS", "IRS"],
+    },
+    "isac": {
+        "ru": ["совмещённая связь и зондирование", "интегрированное зондирование и связь"],
+        "en": ["integrated sensing and communication", "joint communication and sensing"],
+        "abbr": ["ISAC", "JCAS"],
+    },
     "radio_relay": {"ru": ["радиорелейная линия", "РРЛ", "радиорелейная связь"],
                     "en": ["radio relay link", "microwave backhaul", "point-to-point microwave"], "abbr": ["RRL", "PTP"]},
     "antenna": {"ru": ["антенная решётка", "фазированная антенная решётка", "АФАР", "апертура"],

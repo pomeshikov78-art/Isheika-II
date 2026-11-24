@@ -154,6 +154,29 @@ def r_doc_label(req, m, body):
                             research_id=body.get("research_id") or req.qs.get("research_id"))
 
 
+
+# ------------------------------------------------------- технический перевод
+@route("GET", r"/api/v1/documents/([^/]+)/translation")
+def r_doc_translation(req, m, body):
+    """Перевод найденного материала на русский язык (ред. 1.5.0)."""
+    S.require(req.session, "research.read")
+    return S.document_translation(m.group(1))
+
+
+@route("POST", r"/api/v1/researches/([^/]+)/translate")
+def r_research_translate(req, m, body):
+    """Перевод материалов исследования; force=true — перевести заново."""
+    S.require(req.session, "research.run")
+    return S.translate_research(m.group(1), force=bool(body.get("force")),
+                                actor=req.session["login"],
+                                limit=int(body["limit"]) if body.get("limit") else None)
+
+
+@route("GET", r"/api/v1/researches/([^/]+)/translation")
+def r_research_translation(req, m, body):
+    S.require(req.session, "research.read")
+    return S.translation_summary(m.group(1))
+
 # ------------------------------------------------------------------ analytics
 @route("GET", r"/api/v1/analytics/([^/]+)")
 def r_analytics(req, m, body):
@@ -761,9 +784,9 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
-    def _json(self, code: int, obj):
+    def _json(self, code: int, obj, extra: dict | None = None):
         self._send(code, json.dumps(obj, ensure_ascii=False, default=str).encode("utf-8"),
-                   "application/json; charset=utf-8")
+                   "application/json; charset=utf-8", extra)
 
     def _err(self, err: CoreError | Exception, code: int = 400):
         if isinstance(err, CoreError):
@@ -901,7 +924,22 @@ class Handler(BaseHTTPRequestHandler):
                         auth = self.headers.get("Authorization") or ""
                         token = auth[7:] if auth.startswith("Bearer ") else self.qs.get("token")
                         self.session = S.session(token)
+                    # ИД-22: идемпотентность изменяющих запросов. Клиент повторяет
+                    # POST с ключом после сетевого сбоя — повтор не должен создавать
+                    # второй объект: возвращаем сохранённый ответ.
+                    idem = self.headers.get("Idempotency-Key") if method in ("POST", "DELETE") else None
+                    sess = self.session if isinstance(self.session, dict) else {}
+                    actor = sess.get("login") or sess.get("user_id") or ""
+                    route_key = f"{method} {path}"
+                    if idem:
+                        from . import idempotency as IDEM
+                        saved = IDEM.lookup(idem, actor=actor, route=route_key, body=body)
+                        if saved is not None:
+                            return self._json(200, saved, {"Idempotency-Replayed": "true"})
                     result = fn(self, m, body)
+                    if idem:
+                        from . import idempotency as IDEM
+                        IDEM.store(idem, actor=actor, route=route_key, body=body, response=result)
                     return self._json(200, result)
                 except CoreError as e:
                     return self._err(e)

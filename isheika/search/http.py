@@ -24,6 +24,7 @@ import urllib.request
 import urllib.robotparser
 from typing import Any
 
+from .. import tls
 from ..config import SETTINGS
 from .. import telemetry
 from ..contracts import CoreError, iso_now, new_id
@@ -78,7 +79,7 @@ def robots_allowed(url: str) -> bool:
         rp = urllib.robotparser.RobotFileParser()
         try:
             req = urllib.request.Request(base + "/robots.txt", headers={"User-Agent": SETTINGS.user_agent})
-            with urllib.request.urlopen(req, timeout=8) as r:
+            with urllib.request.urlopen(req, timeout=8, context=tls.context()) as r:
                 raw = r.read(200_000).decode("utf-8", "replace")
             rp.parse(raw.splitlines())
         except Exception:
@@ -153,7 +154,8 @@ def request(url: str, *, method: str = "GET", headers: dict | None = None, data:
         t0 = time.time()
         try:
             req = urllib.request.Request(url, headers=hdrs, data=data, method=method)
-            with urllib.request.urlopen(req, timeout=timeout or SETTINGS.http_timeout) as resp:
+            with urllib.request.urlopen(req, timeout=timeout or SETTINGS.http_timeout,
+                                        context=tls.context()) as resp:
                 raw = resp.read()
                 if resp.headers.get("Content-Encoding") == "gzip":
                     raw = gzip.decompress(raw)
@@ -200,6 +202,12 @@ def request(url: str, *, method: str = "GET", headers: dict | None = None, data:
         except (urllib.error.URLError, socket.timeout, TimeoutError, OSError) as e:
             dur = int((time.time() - t0) * 1000)
             _log_api("http", conn["code"], url, None, dur, 0, False, research_id, error_code="E_NETWORK")
+            tls_hint = tls.hint(str(e))
+            if tls_hint:
+                # Отказ проверки сертификата повтором не лечится: повторы лишь
+                # утраивают запись в журнале и задерживают этап поиска.
+                raise CoreError("E_NETWORK", mask(str(e))[:200], retryable=False, url=url,
+                                tls_hint=tls_hint, anchors=tls.info().get("total_anchors"))
             last_err = CoreError("E_NETWORK", mask(str(e))[:200], retryable=True, url=url)
             if attempt < max_attempts:
                 time.sleep(min(20.0, 1.5 ** attempt))

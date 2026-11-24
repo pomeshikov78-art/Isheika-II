@@ -162,6 +162,7 @@ def _run(research_id: str, correlation_id: str | None = None) -> None:
 
 def _run_stages(research_id: str) -> None:
     from ..storage import db as _db
+    from . import pipeline as _pipeline          # регистрация обработчиков этапов
     _db.connect()
     ctx: dict = {"research_id": research_id}
     failed: list[str] = []
@@ -195,10 +196,17 @@ def _run_stages(research_id: str) -> None:
             events.emit("job.started", research_id=research_id, job_id=job["id"],
                         payload={"stage": stage, "name": name})
             try:
+                previous = result_signature(job.get("result"))
                 result = handler(job, ctx) or {}
                 state = result.pop("_state", "completed")
                 set_job_state(job["id"], state, result=result, progress=1.0)
                 ctx[stage] = result
+                # Этап выполнен заново и дал другой предметный результат —
+                # зависимые этапы обязаны пересчитаться, иначе новые документы
+                # не дойдут до оценки, расчётов и отчёта (ИД-17).
+                if job["attempts"] > 0 and result_signature(result) != previous:
+                    invalidate_dependents(research_id, stage,
+                                          reason="Результат этапа изменился при повторном выполнении")
                 if state == "partial":
                     partial.append(stage)
                 events.emit("job.completed", research_id=research_id, job_id=job["id"],
@@ -253,6 +261,66 @@ def _run_stages(research_id: str) -> None:
     finally:
         with _LOCK:
             _RUNNING.pop(research_id, None)
+
+
+
+# Поля, которые меняются от запуска к запуску сами по себе (время, счётчики
+# обращений) и не означают изменения предметного результата этапа.
+_VOLATILE = {"at", "generated_at", "checked_at", "started_at", "finished_at",
+             "duration_ms", "elapsed_ms", "run_id", "report_id", "created_at"}
+
+
+def result_signature(result: dict | None) -> str:
+    """Подпись предметного результата этапа — для решения о пересчёте зависимых."""
+    import hashlib
+    import json
+    data = {k: v for k, v in (result or {}).items() if k not in _VOLATILE and not k.startswith("_")}
+    return hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False,
+                                     default=str).encode("utf-8")).hexdigest()[:16]
+
+
+def dependents(stage: str) -> list[str]:
+    """Все этапы, которые прямо или косвенно зависят от данного (в порядке графа)."""
+    out: list[str] = []
+    for s, _name, deps in STAGES:
+        if s == stage:
+            continue
+        if any(d == stage or d in out for d in deps):
+            out.append(s)
+    return out
+
+
+def invalidate_dependents(research_id: str, stage: str, *, reason: str) -> list[str]:
+    """Возвращает зависимые этапы в очередь пересчёта.
+
+    Основание — журнал с машины пользователя (ред. 1.4.2): повторный запуск
+    выполнял только этап 3, находил новые документы, а этапы 4–12 считались
+    завершёнными и пропускались. Новые документы не оценивались и не попадали
+    в отчёт, хотя исследование помечалось завершённым.
+    """
+    reset: list[str] = []
+    for s in dependents(stage):
+        row = db.one("SELECT id, status FROM workflow_jobs WHERE research_id=? AND stage=?",
+                     (research_id, s))
+        if not row or row["status"] not in ("completed", "partial", "skipped"):
+            continue
+        set_job_state(row["id"], "queued", reason=reason,
+                      progress=0, processed=0, total=0,
+                      error_code=None, error_message=None,
+                      started_at=None, finished_at=None, duration_ms=None)
+        reset.append(s)
+    if reset:
+        events.emit("job.invalidated", research_id=research_id,
+                    payload={"stage": stage, "reset": reset, "reason": reason})
+        try:
+            from .. import journal
+            journal.record(level="info", kind="workflow", action="workflow.recompute",
+                           message=f"Пересчёт этапов после изменения «{stage}»: {', '.join(reset)}",
+                           source="workflow", research_id=research_id,
+                           detail={"stage": stage, "reset": reset, "reason": reason})
+        except Exception:
+            pass
+    return reset
 
 
 def _summary(result: dict) -> dict:

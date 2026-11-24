@@ -242,6 +242,12 @@ t('журнал загрузки: окно самопроверки открыв
   const m = window.document.getElementById('modal-body');
   return !!m && m.innerHTML.includes('Самопроверка') && m.innerHTML.includes('Ресурсы интерфейса');
 });
+t('журнал загрузки: видно состояние доверия сертификатам', () => {
+  const m = window.document.getElementById('modal-body');
+  const html = m ? m.innerHTML : '';
+  return html.includes('Доверие сертификатам') && /корней \(системных/.test(html)
+    ? true : 'сведений о корневых сертификатах нет';
+});
 App.closeModal();
 
 t('версия в шапке берётся с сервера', () => {

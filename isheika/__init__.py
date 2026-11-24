@@ -13,7 +13,7 @@
     api        — REST /api/v1 (ТЗ-06 §7)
 """
 
-__version__ = "1.4.2"
+__version__ = "1.5.1"
 CODENAME = "ISHEIKA-NTR-AI"
 METHODOLOGY_VERSION = "M-1.0.0"
 API_VERSION = "v1"

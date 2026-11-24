@@ -22,6 +22,7 @@ from .adapters import build_adapter, extract_json
 
 TASK_CLASS_PROFILE = {
     "query_expansion": {"langs": ["ru", "en"], "json": True, "quality_weight": 0.3},
+    "technical_translation": {"langs": ["ru", "en"], "json": False, "quality_weight": 0.6},
     "science_analysis": {"langs": ["ru", "en"], "json": True, "quality_weight": 0.5},
     "patent_analysis": {"langs": ["en"], "json": True, "quality_weight": 0.5},
     "industry_analysis": {"langs": ["ru", "en"], "json": True, "quality_weight": 0.4},

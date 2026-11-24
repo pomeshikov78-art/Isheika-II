@@ -140,6 +140,16 @@ def self_check() -> list[dict]:
         add("Маршруты API зарегистрированы", False, f"{type(exc).__name__}: {exc}")
 
     try:
+        from . import tls
+        ti = tls.info()
+        add("Доверенные сертификаты на месте", bool(ti.get("bundled_certs")) and ti.get("total_anchors", 0) > 0,
+            f"корней всего {ti.get('total_anchors', 0)}; системных {ti.get('system_anchors', 0)}; "
+            f"в наборе приложения {ti.get('bundled_certs', 0)}"
+            + (f"; дополнительный набор {ti['extra_path']}" if ti.get("extra_path") else ""))
+    except Exception as exc:
+        add("Доверенные сертификаты на месте", False, f"{type(exc).__name__}: {exc}")
+
+    try:
         from . import slo
         probes = slo.run_probes()
         bad = [p["component"] for p in probes if not p["ok"]]
@@ -152,6 +162,22 @@ def self_check() -> list[dict]:
     return checks
 
 
+def _tls_info() -> dict:
+    """Сведения о доверии для публичного журнала загрузки — без путей файловой системы."""
+    try:
+        from . import tls
+        i = tls.info()
+        return {"system_anchors": i.get("system_anchors", 0),
+                "bundled_certs": i.get("bundled_certs", 0),
+                "bundled_anchors": i.get("bundled_anchors", 0),
+                "total_anchors": i.get("total_anchors", 0),
+                "extra_bundle": bool(i.get("extra_path")),
+                "extra_anchors": i.get("extra_anchors", 0),
+                "verify": i.get("verify", False)}
+    except Exception as exc:                      # самопроверка не должна падать
+        return {"error": f"{type(exc).__name__}: {exc}"[:200]}
+
+
 def snapshot(*, with_checks: bool = True) -> dict:
     checks = self_check() if with_checks else _LAST_CHECKS
     return {
@@ -161,6 +187,7 @@ def snapshot(*, with_checks: bool = True) -> dict:
         "data_dir": DATA_DIR, "web_dir": WEB_DIR,
         "network_enabled": SETTINGS.network_enabled, "paid_ai_allowed": SETTINGS.allow_paid_ai,
         "steps": list(_STEPS), "checks": checks, "assets": ui_assets(),
+        "tls": _tls_info(),
         "ok": all(c["ok"] for c in checks) and not any(s["status"] == "fail" for s in _STEPS),
         "note": "Журнал загрузки не содержит ключей и персональных данных.",
     }

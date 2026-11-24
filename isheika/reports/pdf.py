@@ -516,9 +516,16 @@ def build_pdf(data: dict, path: str) -> str:
     docs = data["documents"] or []
     if docs:
         doc.heading("Приложение А. Документы (топ по релевантности)", 2)
-        doc.table(["Название", "Тип", "Страна", "R", "Класс"],
-                  [[d["title"], d["doc_type"], d["country_code"] or "—", _fmt(d.get("score"), 3), d.get("rclass") or d["state"]]
+        doc.table(["Название (рус.)", "Тип", "Страна", "R", "Класс"],
+                  [[d.get("title_ru") or d["title"], d["doc_type"], d["country_code"] or "—",
+                    _fmt(d.get("score"), 3), d.get("rclass") or d["state"]]
                    for d in docs], [4, 1, 0.7, 0.6, 0.9], max_rows=50)
+        trn = data.get("translation") or {}
+        if trn.get("translated"):
+            doc.para(f"Технический перевод: {trn['translated']} материалов, "
+                     f"требуют вычитки {trn.get('review_required', 0)}; словарь {trn.get('glossary_version')}. "
+                     "Терминологический режим — черновик: числа, единицы и обозначения сохранены, "
+                     "формулировки требуют вычитки специалистом.", 8.5, 0.15, space_after=2)
 
     doc.heading("11. Ограничения и предупреждения", 1)
     from .builder import warnings

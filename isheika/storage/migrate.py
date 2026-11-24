@@ -375,9 +375,48 @@ def migrate_0006_journal(conn) -> dict:
     return {"tables_created": ["ops_journal"] if created else []}
 
 
+
+def migrate_0007_translation(conn) -> dict:
+    """Технический перевод найденных материалов на русский (ред. 1.5.0).
+
+    Предметные данные не изменяются: перевод хранится отдельно от оригинала,
+    рядом с режимом перевода, долей переведённого и признаком вычитки.
+    """
+    created = "document_translations" not in _tables(conn)
+    conn.execute("""CREATE TABLE IF NOT EXISTS document_translations (
+        id TEXT PRIMARY KEY, document_id TEXT NOT NULL, research_id TEXT,
+        lang_from TEXT, lang_to TEXT NOT NULL DEFAULT 'ru',
+        title_ru TEXT, abstract_ru TEXT, text_ru TEXT,
+        mode TEXT NOT NULL CHECK (mode IN ('original','terminology','ai_technical')),
+        provider TEXT, model TEXT, glossary_version TEXT,
+        coverage REAL, untranslated TEXT NOT NULL DEFAULT '[]',
+        review_required INTEGER NOT NULL DEFAULT 1,
+        source_hash TEXT, created_at TEXT, updated_at TEXT)""")
+    for sql in ("CREATE UNIQUE INDEX IF NOT EXISTS ux_translation_doc ON document_translations(document_id, lang_to)",
+                "CREATE INDEX IF NOT EXISTS ix_translation_research ON document_translations(research_id)",
+                "CREATE INDEX IF NOT EXISTS ix_translation_mode ON document_translations(mode)"):
+        conn.execute(sql)
+    return {"tables_created": ["document_translations"] if created else []}
+
+def migrate_0008_idempotency(conn) -> dict:
+    """Идемпотентность изменяющих запросов (ИД-22, ред. 1.5.1).
+
+    Клиент отправляет `Idempotency-Key` и повторяет запрос после сетевого сбоя.
+    Без серверной поддержки повтор создавал второе исследование.
+    """
+    created = "ops_idempotency" not in _tables(conn)
+    conn.execute("""CREATE TABLE IF NOT EXISTS ops_idempotency (
+        key TEXT PRIMARY KEY, actor TEXT, route TEXT NOT NULL, body_hash TEXT NOT NULL,
+        response TEXT NOT NULL, created_at TEXT NOT NULL)""")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_idempotency_created ON ops_idempotency(created_at)")
+    return {"tables_created": ["ops_idempotency"] if created else []}
+
+
 MIGRATIONS = [("0002_tz_v11", migrate_0002), ("0003_observability", migrate_0003_observability),
               ("0004_ops", migrate_0004_ops), ("0005_boot_log", migrate_0005_boot_log),
-              ("0006_journal", migrate_0006_journal)]
+              ("0006_journal", migrate_0006_journal),
+              ("0007_translation", migrate_0007_translation),
+              ("0008_idempotency", migrate_0008_idempotency)]
 
 
 def apply_all(conn) -> list[dict]:

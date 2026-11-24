@@ -17,6 +17,7 @@ from ..analytics import snapshot as SNAP
 from ..ai import agents as A, collective as C
 from ..reports import builder as RB
 from ..search import expansion as EX, manager as SM, query_parser as QP
+from .. import translation as TR
 from ..workflow import engine as W
 from ..workflow import events
 
@@ -186,10 +187,16 @@ def stage_document_processing(job: dict, ctx: dict) -> dict:
     if known_before:
         note += f"; ранее известных документов: {known_before} из {total} (корпус общий для исследований)"
     W.progress(job["id"], total, total, note)
+    # Технический перевод найденной НТИ на русский язык (задача пользователя):
+    # иностранные заголовки и аннотации переводятся с сохранением чисел и единиц.
+    tr = TR.run(rid, progress_cb=lambda p, t, m: W.progress(job["id"], p, t, m))
+    note += f"; перевод на русский: {tr['translated']} материалов"
+    W.progress(job["id"], total, total, note)
     return {"documents_total": total, "unique": uniq, "duplicates": dup,
             "new_in_corpus": new_in_corpus, "known_before": known_before,
             "occurrences": dd["occurrences"], "clusters": dd["clusters"], "relations": dd["relations"],
             "languages": {r["language"] or "unknown": r["n"] for r in langs},
+            "translation": tr,
             "_state": "completed" if total else "partial"}
 
 

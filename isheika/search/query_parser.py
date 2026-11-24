@@ -26,10 +26,14 @@ ENTITY_LEXICON = {
     "material": ["материал", "material", "композит", "composite", "графен", "graphene"],
     "radar": ["радар", "радиолокац", "radar", "рлс"],
     "optical_comm": ["оптическ связь", "free space optic", "fso", "лазерн связь"],
+    "mobile_generation": ["6g", "5g", "4g", "imt-2030", "imt-2020", "поколен связи", "мобильн связь"],
+    "terahertz": ["терагерц", "terahertz", "thz", "субтерагерц", "sub-thz"],
+    "ris": ["ris", "интеллектуальн поверхн", "reconfigurable intelligent", "metasurface", "метаповерхн"],
+    "isac": ["isac", "совмещённ связь", "joint communication and sensing", "интегрированн зондирован"],
 }
 
 PURPOSE_LEXICON = {
-    "communication": ["связь", "communication", "передач данн", "канал", "link"],
+    "communication": ["связь", "communication", "передач данн", "канал", "link", "6g", "5g", "imt-2030"],
     "energy_storage": ["накоплен энерги", "хранен энерги", "energy storage", "ёмкость", "емкость"],
     "propulsion": ["движен", "тяга", "propulsion", "двигател"],
     "sensing": ["обнаружен", "измерен", "мониторинг", "sensing", "датчик"],
@@ -109,9 +113,33 @@ def detect_language(text: str) -> str:
     return "en"
 
 
+# Короткие технические обозначения: отбрасывать их нельзя — запрос «6G»
+# разбирался в пустой список терминов, и ни один документ не проходил порог
+# релевантности (прогон 1.5.0 на реальных источниках).
+SHORT_TECH = set("""6g 5g 4g 3g 2g ai ml dl rf thz uhf shf ehf vhf hf lf mf if dc ac
+ mimo ofdm iot urllc embb mmtc ris isac oam qkd leo geo meo uav gnss imu lidar adc dac
+ fpga asic cmos gan sic inp qam psk ldpc snr sinr ber evm csi ran oran ntn d2d v2x xr ar
+ vr mr api sdk cpu gpu npu tpu soc sip pcb mems nems los nlos bw fft dft awgn rms qpsk
+""".split())
+
+
+# Короткие обозначения-ОМОНИМЫ: «6G» — и поколение связи, и краситель Rhodamine 6G;
+# «5g» — и стандарт, и масса в граммах; «LEO» — и орбита, и имя. Такое обозначение
+# само по себе не подтверждает предметную область (ИД-19): требуется второй,
+# независимый сигнал области (иная сущность, назначение или иное слово ядра).
+AMBIGUOUS_SHORT = set("""6g 5g 4g 3g 2g ris leo geo meo sic gan inp ar vr mr if dc ac hf lf mf oam soc sip
+""".split())
+
+
 def tokenize(text: str) -> list[str]:
     words = re.findall(r"[a-zA-Zа-яА-ЯёЁ0-9][a-zA-Zа-яА-ЯёЁ0-9\-]{1,}", text.lower())
-    return [w for w in words if w not in STOPWORDS and len(w) > 2]
+    out = []
+    for w in words:
+        if w in STOPWORDS:
+            continue
+        if len(w) > 2 or w in SHORT_TECH or re.fullmatch(r"\d+[a-z]{1,3}", w):
+            out.append(w)
+    return out
 
 
 def parse(text: str) -> ParsedQuery:
