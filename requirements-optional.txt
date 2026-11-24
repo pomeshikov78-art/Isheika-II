@@ -1,0 +1,37 @@
+# Необязательные зависимости. Ядро работает на стандартной библиотеке Python 3.11+.
+# Ставить только при переходе на промышленный контур (см. ARCHITECTURE.md §9, ROADMAP.md P5).
+
+# --- API-транспорт (готовый адаптер: isheika/api/adapters_fastapi.py)
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.6
+
+# --- СУБД и поиск
+psycopg[binary]>=3.1          # PostgreSQL вместо SQLite
+opensearch-py>=2.4            # полнотекстовый поиск
+pgvector>=0.2                 # векторный поиск (компонента S)
+
+# --- очередь заданий вместо потоков
+redis>=5.0
+celery>=5.3
+
+# --- семантика (компонента S; до подключения используется лексическая аппроксимация)
+sentence-transformers>=2.6    # требует torch; включать только с версией методики M-1.1+
+
+# --- отчёты (при наличии WeasyPrint PDF собирается из HTML автоматически)
+weasyprint>=61                # типографская вёрстка PDF
+python-docx>=1.1              # альтернатива встроенному OOXML-писателю
+openpyxl>=3.1                 # альтернатива встроенному XLSX-писателю
+
+# --- секреты и аутентификация
+cryptography>=42              # KMS/Vault-совместимое шифрование
+authlib>=1.3                  # OIDC/SSO
+
+# --- наблюдаемость
+prometheus-client>=0.20
+opentelemetry-sdk>=1.24
+
+# --- dev-инструменты проверки (Node.js, не Python):
+#   npm install jsdom pdfjs-dist
+#   node tools/ui_check.mjs
+#   node tools/pdf_check.mjs <файл.pdf>

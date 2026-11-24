@@ -1,0 +1,1041 @@
+{
+ "version": "GSR-1.0",
+ "count": 35,
+ "items": [
+  {
+   "iso2": "US",
+   "name_ru": "США",
+   "region": "Северная Америка",
+   "patent_office": "USPTO",
+   "languages": [
+    "en"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0177",
+    "SRC-0720",
+    "SRC-0166",
+    "SRC-0333",
+    "SRC-0332",
+    "SRC-0503",
+    "SRC-0139",
+    "SRC-0644",
+    "SRC-0237",
+    "SRC-0144",
+    "SRC-0055",
+    "SRC-0149",
+    "SRC-0143",
+    "SRC-0782",
+    "SRC-0329",
+    "SRC-0502",
+    "SRC-0719",
+    "SRC-0610",
+    "SRC-0735",
+    "SRC-0731",
+    "SRC-0335",
+    "SRC-0611",
+    "SRC-0771",
+    "SRC-0330",
+    "SRC-0504",
+    "SRC-0498",
+    "SRC-0482",
+    "SRC-0466",
+    "SRC-0736",
+    "SRC-0385"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "CA",
+   "name_ru": "Канада",
+   "region": "Северная Америка",
+   "patent_office": "CIPO",
+   "languages": [
+    "en",
+    "fr"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0265",
+    "SRC-0148",
+    "SRC-0799",
+    "SRC-0074",
+    "SRC-0443",
+    "SRC-0348",
+    "SRC-0500",
+    "SRC-0565",
+    "SRC-0653",
+    "SRC-0266",
+    "SRC-0501",
+    "SRC-0371"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "MX",
+   "name_ru": "Мексика",
+   "region": "Латинская Америка",
+   "patent_office": "IMPI",
+   "languages": [
+    "es"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0184",
+    "SRC-0186",
+    "SRC-0036",
+    "SRC-0460",
+    "SRC-0200",
+    "SRC-0282",
+    "SRC-0634",
+    "SRC-0028",
+    "SRC-0618",
+    "SRC-0472",
+    "SRC-0376"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "BR",
+   "name_ru": "Бразилия",
+   "region": "Латинская Америка",
+   "patent_office": "INPI BR",
+   "languages": [
+    "pt"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0290",
+    "SRC-0154",
+    "SRC-0197",
+    "SRC-0343",
+    "SRC-0344",
+    "SRC-0032",
+    "SRC-0087",
+    "SRC-0777",
+    "SRC-0483",
+    "SRC-0606",
+    "SRC-0093",
+    "SRC-0471",
+    "SRC-0362"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "AR",
+   "name_ru": "Аргентина",
+   "region": "Латинская Америка",
+   "patent_office": "INPI AR",
+   "languages": [
+    "es"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0289",
+    "SRC-0256",
+    "SRC-0038",
+    "SRC-0209",
+    "SRC-0196",
+    "SRC-0021",
+    "SRC-0229",
+    "SRC-0226",
+    "SRC-0636",
+    "SRC-0734",
+    "SRC-0092",
+    "SRC-0474",
+    "SRC-0360"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "CO",
+   "name_ru": "Колумбия",
+   "region": "Латинская Америка",
+   "patent_office": "SIC",
+   "languages": [
+    "es"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0112",
+    "SRC-0119",
+    "SRC-0260",
+    "SRC-0199",
+    "SRC-0319",
+    "SRC-0788",
+    "SRC-0228",
+    "SRC-0626",
+    "SRC-0489",
+    "SRC-0373"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "CL",
+   "name_ru": "Чили",
+   "region": "Латинская Америка",
+   "patent_office": "INAPI",
+   "languages": [
+    "es"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0284",
+    "SRC-0005",
+    "SRC-0004",
+    "SRC-0198",
+    "SRC-0227",
+    "SRC-0283",
+    "SRC-0789",
+    "SRC-0633",
+    "SRC-0464",
+    "SRC-0391"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "PE",
+   "name_ru": "Перу",
+   "region": "Латинская Америка",
+   "patent_office": "INDECOPI",
+   "languages": [
+    "es"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0286",
+    "SRC-0003",
+    "SRC-0350",
+    "SRC-0037",
+    "SRC-0791",
+    "SRC-0632",
+    "SRC-0473",
+    "SRC-0379"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "JP",
+   "name_ru": "Япония",
+   "region": "Азия",
+   "patent_office": "JPO",
+   "languages": [
+    "ja",
+    "en"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0103",
+    "SRC-0029",
+    "SRC-0301",
+    "SRC-0140",
+    "SRC-0485",
+    "SRC-0793",
+    "SRC-0497",
+    "SRC-0002",
+    "SRC-0191",
+    "SRC-0569",
+    "SRC-0117",
+    "SRC-0105",
+    "SRC-0486",
+    "SRC-0395",
+    "SRC-0302"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "KR",
+   "name_ru": "Южная Корея",
+   "region": "Азия",
+   "patent_office": "KIPO",
+   "languages": [
+    "ko",
+    "en"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0111",
+    "SRC-0204",
+    "SRC-0304",
+    "SRC-0351",
+    "SRC-0797",
+    "SRC-0107",
+    "SRC-0150",
+    "SRC-0110",
+    "SRC-0641",
+    "SRC-0640",
+    "SRC-0109",
+    "SRC-0508",
+    "SRC-0393",
+    "SRC-0303"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "MY",
+   "name_ru": "Малайзия",
+   "region": "Азия",
+   "patent_office": "MyIPO",
+   "languages": [
+    "ms",
+    "en"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0130",
+    "SRC-0129",
+    "SRC-0493",
+    "SRC-0125",
+    "SRC-0127",
+    "SRC-0309",
+    "SRC-0306",
+    "SRC-0114",
+    "SRC-0659",
+    "SRC-0491",
+    "SRC-0375"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "AU",
+   "name_ru": "Австралия",
+   "region": "Океания",
+   "patent_office": "IP Australia",
+   "languages": [
+    "en"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0294",
+    "SRC-0538",
+    "SRC-0188",
+    "SRC-0222",
+    "SRC-0009",
+    "SRC-0467",
+    "SRC-0539",
+    "SRC-0783",
+    "SRC-0007",
+    "SRC-0658",
+    "SRC-0468",
+    "SRC-0358"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "IN",
+   "name_ru": "Индия",
+   "region": "Азия",
+   "patent_office": "IPO India",
+   "languages": [
+    "en",
+    "hi"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0296",
+    "SRC-0352",
+    "SRC-0091",
+    "SRC-0090",
+    "SRC-0059",
+    "SRC-0044",
+    "SRC-0058",
+    "SRC-0717",
+    "SRC-0142",
+    "SRC-0785",
+    "SRC-0614",
+    "SRC-0100",
+    "SRC-0479",
+    "SRC-0368",
+    "SRC-0299"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "CN",
+   "name_ru": "Китай",
+   "region": "Азия",
+   "patent_office": "CNIPA",
+   "languages": [
+    "zh",
+    "en"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0451",
+    "SRC-0267",
+    "SRC-0345",
+    "SRC-0356",
+    "SRC-0242",
+    "SRC-0027",
+    "SRC-0506",
+    "SRC-0445",
+    "SRC-0794",
+    "SRC-0202",
+    "SRC-0795",
+    "SRC-0650",
+    "SRC-0752",
+    "SRC-0507",
+    "SRC-0372",
+    "SRC-0268"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "AE",
+   "name_ru": "ОАЭ",
+   "region": "Ближний Восток",
+   "patent_office": "MOIP",
+   "languages": [
+    "ar",
+    "en"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0126",
+    "SRC-0225",
+    "SRC-0108",
+    "SRC-0124",
+    "SRC-0737",
+    "SRC-0661",
+    "SRC-0123",
+    "SRC-0324",
+    "SRC-0643",
+    "SRC-0307",
+    "SRC-0469",
+    "SRC-0378",
+    "SRC-0308"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "TR",
+   "name_ru": "Турция",
+   "region": "Ближний Восток",
+   "patent_office": "TÜRKPATENT",
+   "languages": [
+    "tr"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0323",
+    "SRC-0048",
+    "SRC-0221",
+    "SRC-0357",
+    "SRC-0224",
+    "SRC-0223",
+    "SRC-0570",
+    "SRC-0219",
+    "SRC-0662",
+    "SRC-0511",
+    "SRC-0387"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "EG",
+   "name_ru": "Египет",
+   "region": "Африка",
+   "patent_office": "EGPO",
+   "languages": [
+    "ar"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0062",
+    "SRC-0013",
+    "SRC-0459",
+    "SRC-0718",
+    "SRC-0272",
+    "SRC-0122",
+    "SRC-0621",
+    "SRC-0061",
+    "SRC-0470",
+    "SRC-0367"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "TN",
+   "name_ru": "Тунис",
+   "region": "Африка",
+   "patent_office": "INNORPI",
+   "languages": [
+    "ar",
+    "fr"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0035",
+    "SRC-0023",
+    "SRC-0287",
+    "SRC-0121",
+    "SRC-0232",
+    "SRC-0233",
+    "SRC-0488",
+    "SRC-0386"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "DZ",
+   "name_ru": "Алжир",
+   "region": "Африка",
+   "patent_office": "INAPI DZ",
+   "languages": [
+    "ar",
+    "fr"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0012",
+    "SRC-0024",
+    "SRC-0208",
+    "SRC-0116",
+    "SRC-0234",
+    "SRC-0624",
+    "SRC-0089",
+    "SRC-0478",
+    "SRC-0359"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "ZA",
+   "name_ru": "ЮАР",
+   "region": "Африка",
+   "patent_office": "CIPC",
+   "languages": [
+    "en"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0297",
+    "SRC-0201",
+    "SRC-0194",
+    "SRC-0721",
+    "SRC-0452",
+    "SRC-0030",
+    "SRC-0047",
+    "SRC-0649",
+    "SRC-0756",
+    "SRC-0499",
+    "SRC-0394"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "VN",
+   "name_ru": "Вьетнам",
+   "region": "Азия",
+   "patent_office": "NOIP",
+   "languages": [
+    "vi"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0285",
+    "SRC-0240",
+    "SRC-0243",
+    "SRC-0239",
+    "SRC-0494",
+    "SRC-0298",
+    "SRC-0461",
+    "SRC-0656",
+    "SRC-0490",
+    "SRC-0364",
+    "SRC-0310"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "GB",
+   "name_ru": "Великобритания",
+   "region": "Европа",
+   "patent_office": "IPO UK",
+   "languages": [
+    "en"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0039",
+    "SRC-0512",
+    "SRC-0801",
+    "SRC-0018",
+    "SRC-0347",
+    "SRC-0104",
+    "SRC-0326",
+    "SRC-0146",
+    "SRC-0562",
+    "SRC-0786",
+    "SRC-0615",
+    "SRC-0800",
+    "SRC-0513",
+    "SRC-0363",
+    "SRC-0300"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "FR",
+   "name_ru": "Франция",
+   "region": "Европа",
+   "patent_office": "INPI FR",
+   "languages": [
+    "fr"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0083",
+    "SRC-0354",
+    "SRC-0458",
+    "SRC-0288",
+    "SRC-0006",
+    "SRC-0034",
+    "SRC-0096",
+    "SRC-0022",
+    "SRC-0781",
+    "SRC-0607",
+    "SRC-0094",
+    "SRC-0465",
+    "SRC-0389"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "DE",
+   "name_ru": "Германия",
+   "region": "Европа",
+   "patent_office": "DPMA",
+   "languages": [
+    "de"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0015",
+    "SRC-0271",
+    "SRC-0220",
+    "SRC-0053",
+    "SRC-0073",
+    "SRC-0049",
+    "SRC-0077",
+    "SRC-0085",
+    "SRC-0115",
+    "SRC-0792",
+    "SRC-0619",
+    "SRC-0732",
+    "SRC-0057",
+    "SRC-0477",
+    "SRC-0365"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "ES",
+   "name_ru": "Испания",
+   "region": "Европа",
+   "patent_office": "OEPM",
+   "languages": [
+    "es"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0312",
+    "SRC-0183",
+    "SRC-0050",
+    "SRC-0051",
+    "SRC-0353",
+    "SRC-0071",
+    "SRC-0120",
+    "SRC-0790",
+    "SRC-0663",
+    "SRC-0463",
+    "SRC-0369"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "IT",
+   "name_ru": "Италия",
+   "region": "Европа",
+   "patent_office": "UIBM",
+   "languages": [
+    "it"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0158",
+    "SRC-0325",
+    "SRC-0101",
+    "SRC-0033",
+    "SRC-0128",
+    "SRC-0064",
+    "SRC-0102",
+    "SRC-0787",
+    "SRC-0664",
+    "SRC-0492",
+    "SRC-0370"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "PT",
+   "name_ru": "Португалия",
+   "region": "Европа",
+   "patent_office": "INPI PT",
+   "languages": [
+    "pt"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0181",
+    "SRC-0176",
+    "SRC-0070",
+    "SRC-0230",
+    "SRC-0231",
+    "SRC-0778",
+    "SRC-0635",
+    "SRC-0095",
+    "SRC-0481",
+    "SRC-0381"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "PL",
+   "name_ru": "Польша",
+   "region": "Европа",
+   "patent_office": "UPRP",
+   "languages": [
+    "pl"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0327",
+    "SRC-0454",
+    "SRC-0455",
+    "SRC-0016",
+    "SRC-0135",
+    "SRC-0137",
+    "SRC-0495",
+    "SRC-0779",
+    "SRC-0648",
+    "SRC-0496",
+    "SRC-0380"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "CZ",
+   "name_ru": "Чехия",
+   "region": "Европа",
+   "patent_office": "ÚPV",
+   "languages": [
+    "cs"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0339",
+    "SRC-0151",
+    "SRC-0180",
+    "SRC-0134",
+    "SRC-0218",
+    "SRC-0076",
+    "SRC-0796",
+    "SRC-0667",
+    "SRC-0251",
+    "SRC-0484",
+    "SRC-0390"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "BG",
+   "name_ru": "Болгария",
+   "region": "Европа",
+   "patent_office": "BPO",
+   "languages": [
+    "bg"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0257",
+    "SRC-0349",
+    "SRC-0019",
+    "SRC-0264",
+    "SRC-0803",
+    "SRC-0205",
+    "SRC-0613",
+    "SRC-0017",
+    "SRC-0517",
+    "SRC-0361"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "GR",
+   "name_ru": "Греция",
+   "region": "Европа",
+   "patent_office": "OBI",
+   "languages": [
+    "el"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0160",
+    "SRC-0084",
+    "SRC-0133",
+    "SRC-0082",
+    "SRC-0311",
+    "SRC-0784",
+    "SRC-0620",
+    "SRC-0480",
+    "SRC-0366"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "SE",
+   "name_ru": "Швеция",
+   "region": "Европа",
+   "patent_office": "PRV",
+   "languages": [
+    "sv"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0217",
+    "SRC-0346",
+    "SRC-0215",
+    "SRC-0241",
+    "SRC-0318",
+    "SRC-0216",
+    "SRC-0192",
+    "SRC-0655",
+    "SRC-0514",
+    "SRC-0392"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "NO",
+   "name_ru": "Норвегия",
+   "region": "Европа",
+   "patent_office": "Patentstyret",
+   "languages": [
+    "no"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0152",
+    "SRC-0444",
+    "SRC-0187",
+    "SRC-0145",
+    "SRC-0315",
+    "SRC-0153",
+    "SRC-0780",
+    "SRC-0657",
+    "SRC-0141",
+    "SRC-0509",
+    "SRC-0377"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "FI",
+   "name_ru": "Финляндия",
+   "region": "Европа",
+   "patent_office": "PRH",
+   "languages": [
+    "fi",
+    "sv"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0189",
+    "SRC-0072",
+    "SRC-0355",
+    "SRC-0106",
+    "SRC-0317",
+    "SRC-0020",
+    "SRC-0244",
+    "SRC-0775",
+    "SRC-0654",
+    "SRC-0510",
+    "SRC-0388"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  },
+  {
+   "iso2": "RU",
+   "name_ru": "Россия",
+   "region": "Евразия",
+   "patent_office": "Роспатент",
+   "languages": [
+    "ru"
+   ],
+   "enabled": true,
+   "national_sources": [
+    "SRC-0063",
+    "SRC-0254",
+    "SRC-0383",
+    "SRC-0258",
+    "SRC-0342",
+    "SRC-0340",
+    "SRC-0516",
+    "SRC-0253",
+    "SRC-0255",
+    "SRC-0670",
+    "SRC-0382",
+    "SRC-0261",
+    "SRC-0263",
+    "SRC-0762",
+    "SRC-0668",
+    "SRC-0683",
+    "SRC-0341",
+    "SRC-0773",
+    "SRC-0384"
+   ],
+   "coverage": {
+    "documents": 0,
+    "class_P": 0,
+    "last_success": null
+   }
+  }
+ ]
+}

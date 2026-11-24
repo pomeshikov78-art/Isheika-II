@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ИЩЕЙКА НТР AI — открытая научно-техническая разведка</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🛰️</text></svg>">
+</head>
+<body>
+<div id="login" class="login-wrap" hidden>
+  <form class="login-card" id="login-form">
+    <h1>ИЩЕЙКА НТР AI</h1>
+    <p class="muted">Открытая научно-техническая разведка с мультиагентным ИИ</p>
+    <label>Пользователь<input name="login" value="analyst" autocomplete="username"></label>
+    <label>Пароль<input name="password" type="password" value="dev:analyst" autocomplete="current-password"></label>
+    <button class="btn primary" type="submit">Войти</button>
+    <div id="login-error" class="alert error" hidden></div>
+    <p class="tiny muted">Профиль DEV: demo-учётные записи admin / lead / analyst / expert / observer / auditor,
+       пароль <code>dev:&lt;логин&gt;</code>. В PILOT/PROD заменяется на корпоративную аутентификацию.</p>
+  </form>
+</div>
+
+<div id="app" class="layout" hidden>
+  <header class="topbar">
+    <button class="icon-btn" id="menu-toggle" title="Свернуть меню" aria-label="Свернуть меню">☰</button>
+    <div class="brand"><span class="logo">🛰️</span><b>ИЩЕЙКА НТР AI</b><span class="ver">v0.1 · DEV</span></div>
+    <div class="global-search">
+      <input id="global-search" type="search" placeholder="Глобальный поиск: технология, изделие, организация…" aria-label="Глобальный поиск">
+      <button class="btn" id="global-search-btn">Найти</button>
+    </div>
+    <div class="topbar-right">
+      <span id="sys-status" class="pill" title="Состояние системы">● система</span>
+      <button class="icon-btn" id="notif-btn" title="Уведомления" aria-label="Уведомления">🔔<span id="notif-count" class="badge">0</span></button>
+      <button class="icon-btn" id="theme-btn" title="Светлая/тёмная тема" aria-label="Переключить тему">🌓</button>
+      <span id="project" class="pill">проект DEMO</span>
+      <span id="user" class="pill user">—</span>
+      <button class="icon-btn" id="logout-btn" title="Выйти" aria-label="Выйти">⎋</button>
+    </div>
+  </header>
+
+  <nav class="sidebar" id="sidebar" aria-label="Модули системы"></nav>
+
+  <main class="workspace" id="workspace" tabindex="-1">
+    <div class="crumbs" id="crumbs"></div>
+    <div id="screen"></div>
+  </main>
+
+  <aside class="context" id="context" aria-label="Контекстная панель">
+    <div class="context-head">
+      <b>Контекст</b>
+      <button class="icon-btn" id="context-toggle" title="Скрыть панель" aria-label="Скрыть панель">»</button>
+    </div>
+    <div id="context-body"><p class="muted tiny">Выберите объект — здесь появятся источники, доказательства и история.</p></div>
+  </aside>
+
+  <footer class="statusbar" id="statusbar">
+    <span id="st-jobs">задания: —</span>
+    <span id="st-method">методика: —</span>
+    <span id="st-period">период: —</span>
+    <span id="st-sync">синхронизация: —</span>
+    <span id="st-conn" class="ok">соединение: активно</span>
+  </footer>
+</div>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<div id="modal" class="modal" hidden><div class="modal-card"><div class="modal-head"><b id="modal-title"></b><button class="icon-btn" id="modal-close" aria-label="Закрыть">✕</button></div><div id="modal-body"></div></div></div>
+
+<script src="charts.js"></script>
+<script src="screens_core.js"></script>
+<script src="screens_registry.js"></script>
+<script src="screens_v11.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

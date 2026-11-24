@@ -1,0 +1,667 @@
+{
+ "version": "CR-1.0",
+ "note": "Реестр коннекторов — отдельная сущность от каталога источников (ТЗ-05 §21.2). implementation: live = код получает реальные данные; stub = запись каталога без реализованного получения; manual = только ручной режим аналитика. requires_key/paid управляют политикой free-first.",
+ "items": [
+  {
+   "code": "CON-OPENALEX",
+   "name": "OpenAlex Works API",
+   "source_name": "OpenAlex",
+   "protocol": "REST",
+   "base_url": "https://api.openalex.org",
+   "auth_type": "optional_key",
+   "secret_ref": "openalex_api_key",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "docs_url": "https://docs.openalex.org/",
+   "capabilities": {
+    "articles": true,
+    "patents": false,
+    "datasets": true,
+    "projects": true,
+    "fulltext": "oa_only",
+    "organizations": true,
+    "citations": true
+   },
+   "limits": {
+    "rps": 10,
+    "per_day": null,
+    "credit_budget_usd_day": 1,
+    "note": "Без ключа — общий бесплатный дневной бюджет и только первая страница; с ключом $1/сут, 30 req/s (CH-01)"
+   },
+   "quota_policy": {
+    "window": "day",
+    "read_headers": [
+     "X-RateLimit-Remaining"
+    ],
+    "preflight": "/rate-limit"
+   },
+   "fallback_code": "CON-CROSSREF",
+   "verified_marker": "П",
+   "priority": "P0",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://docs.openalex.org/"
+  },
+  {
+   "code": "CON-CROSSREF",
+   "name": "Crossref Works API",
+   "source_name": "Crossref",
+   "protocol": "REST",
+   "base_url": "https://api.crossref.org",
+   "auth_type": "mailto",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "docs_url": "https://api.crossref.org/swagger-ui/index.html",
+   "capabilities": {
+    "articles": true,
+    "patents": false,
+    "datasets": true,
+    "fulltext": "no",
+    "doi": true
+   },
+   "limits": {
+    "rps": 1,
+    "rps_polite": 3,
+    "note": "Списочные запросы 1 req/s public / 3 req/s polite (CH-02)"
+   },
+   "quota_policy": {
+    "window": "second",
+    "polite_pool": true
+   },
+   "fallback_code": "CON-OPENALEX",
+   "verified_marker": "П",
+   "priority": "P0",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://www.crossref.org/documentation/retrieve-metadata/rest-api/"
+  },
+  {
+   "code": "CON-ARXIV",
+   "name": "arXiv API (Atom)",
+   "source_name": "arXiv",
+   "protocol": "ATOM",
+   "base_url": "http://export.arxiv.org/api/query",
+   "auth_type": "none",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "docs_url": "https://info.arxiv.org/help/api/index.html",
+   "capabilities": {
+    "articles": true,
+    "preprints": true,
+    "fulltext": "oa_only"
+   },
+   "limits": {
+    "rps": 0.33,
+    "note": "1 запрос / 3 секунды"
+   },
+   "quota_policy": {
+    "window": "second"
+   },
+   "verified_marker": "П",
+   "priority": "P0",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://info.arxiv.org/help/api/tou.html"
+  },
+  {
+   "code": "CON-DOAJ",
+   "name": "DOAJ Articles API",
+   "source_name": "DOAJ",
+   "protocol": "REST",
+   "base_url": "https://doaj.org/api",
+   "auth_type": "none",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "articles": true,
+    "fulltext": "oa_only",
+    "journals": true
+   },
+   "limits": {
+    "rps": 2,
+    "note": "Пауза ≈0.5 с между запросами"
+   },
+   "quota_policy": {
+    "window": "second"
+   },
+   "verified_marker": "П",
+   "priority": "P0",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://doaj.org/docs/api/"
+  },
+  {
+   "code": "CON-EUROPEPMC",
+   "name": "Europe PMC REST",
+   "source_name": "Europe PMC",
+   "protocol": "REST",
+   "base_url": "https://www.ebi.ac.uk/europepmc/webservices/rest",
+   "auth_type": "none",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "articles": true,
+    "fulltext": "oa_only",
+    "grants": true
+   },
+   "limits": {
+    "rps": 3
+   },
+   "quota_policy": {
+    "window": "second"
+   },
+   "verified_marker": "П",
+   "priority": "P1",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://europepmc.org/RestfulWebService"
+  },
+  {
+   "code": "CON-DATACITE",
+   "name": "DataCite DOI API",
+   "source_name": "DataCite",
+   "protocol": "REST",
+   "base_url": "https://api.datacite.org",
+   "auth_type": "none",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "datasets": true,
+    "articles": true,
+    "software": true
+   },
+   "limits": {
+    "rps": 3
+   },
+   "quota_policy": {
+    "window": "second"
+   },
+   "verified_marker": "Р",
+   "priority": "P1",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://support.datacite.org/docs/api"
+  },
+  {
+   "code": "CON-OSTI",
+   "name": "OSTI.GOV Records API",
+   "source_name": "OSTI.GOV",
+   "protocol": "XML",
+   "base_url": "https://www.osti.gov/api/v1/records",
+   "auth_type": "none",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "reports": true,
+    "articles": true,
+    "fulltext": "often"
+   },
+   "limits": {
+    "rps": 2
+   },
+   "quota_policy": {
+    "window": "second"
+   },
+   "verified_marker": "П",
+   "priority": "P0",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://www.osti.gov/api/v1/docs"
+  },
+  {
+   "code": "CON-HAL",
+   "name": "HAL (Франция) Search API",
+   "source_name": "HAL",
+   "protocol": "REST",
+   "base_url": "https://api.archives-ouvertes.fr/search/",
+   "auth_type": "none",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "articles": true,
+    "theses": true,
+    "reports": true
+   },
+   "limits": {
+    "rps": 2
+   },
+   "quota_policy": {
+    "window": "second"
+   },
+   "country_code": "FR",
+   "verified_marker": "П",
+   "priority": "P1",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://api.archives-ouvertes.fr/docs/search"
+  },
+  {
+   "code": "CON-ZENODO",
+   "name": "Zenodo Records API",
+   "source_name": "Zenodo",
+   "protocol": "REST",
+   "base_url": "https://zenodo.org/api/records",
+   "auth_type": "none",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "datasets": true,
+    "software": true,
+    "reports": true
+   },
+   "limits": {
+    "rps": 2
+   },
+   "quota_policy": {
+    "window": "second"
+   },
+   "verified_marker": "Р",
+   "priority": "P1",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://developers.zenodo.org/"
+  },
+  {
+   "code": "CON-OPENAIRE",
+   "name": "OpenAIRE Graph API (JSON)",
+   "source_name": "OpenAIRE",
+   "protocol": "REST",
+   "base_url": "https://api.openaire.eu/graph/v1/researchProducts",
+   "auth_type": "none",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "articles": true,
+    "datasets": true,
+    "projects": true
+   },
+   "limits": {
+    "rps": 2,
+    "note": "XML Search API отключён 31.05.2026 — только Graph API"
+   },
+   "quota_policy": {
+    "window": "second"
+   },
+   "verified_marker": "П",
+   "priority": "P1",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://graph.openaire.eu/docs/apis/"
+  },
+  {
+   "code": "CON-STACKEXCHANGE",
+   "name": "Stack Exchange API 2.3",
+   "source_name": "Stack Exchange",
+   "protocol": "REST",
+   "base_url": "https://api.stackexchange.com/2.3",
+   "auth_type": "optional_key",
+   "secret_ref": "stackexchange_key",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "forum": true,
+    "problems": true
+   },
+   "limits": {
+    "per_day": 300,
+    "note": "quota_remaining читается из ответа"
+   },
+   "quota_policy": {
+    "window": "day",
+    "read_field": "quota_remaining"
+   },
+   "verified_marker": "Р",
+   "priority": "P2",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://api.stackexchange.com/docs"
+  },
+  {
+   "code": "CON-ROR",
+   "name": "ROR Organizations API v2",
+   "source_name": "ROR",
+   "protocol": "REST",
+   "base_url": "https://api.ror.org/v2/organizations",
+   "auth_type": "none",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "organizations": true
+   },
+   "limits": {
+    "rps": 3
+   },
+   "quota_policy": {
+    "window": "second"
+   },
+   "verified_marker": "П",
+   "priority": "P1",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://ror.readme.io/docs/rest-api"
+  },
+  {
+   "code": "CON-NTRS",
+   "name": "NASA NTRS Citations Search",
+   "source_name": "NASA NTRS",
+   "protocol": "REST",
+   "base_url": "https://ntrs.nasa.gov/api/citations/search",
+   "auth_type": "none",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "reports": true,
+    "fulltext": "often",
+    "trl_evidence": true
+   },
+   "limits": {
+    "rps": 2,
+    "note": "Без ключа; при 403 фиксировать деградацию, не подменять данные"
+   },
+   "quota_policy": {
+    "window": "second"
+   },
+   "verified_marker": "П",
+   "priority": "P0",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://ntrs.nasa.gov/api/openapi/"
+  },
+  {
+   "code": "CON-UNPAYWALL",
+   "name": "Unpaywall OA lookup",
+   "source_name": "Unpaywall",
+   "protocol": "REST",
+   "base_url": "https://api.unpaywall.org/v2",
+   "auth_type": "email",
+   "secret_ref": "contact_email",
+   "requires_key": true,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "oa_status": true
+   },
+   "limits": {
+    "per_day": 100000
+   },
+   "quota_policy": {
+    "window": "day"
+   },
+   "verified_marker": "П",
+   "priority": "P1",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://unpaywall.org/products/api"
+  },
+  {
+   "code": "CON-CORE",
+   "name": "CORE v3 Search Works",
+   "source_name": "CORE",
+   "protocol": "REST",
+   "base_url": "https://api.core.ac.uk/v3",
+   "auth_type": "api_key",
+   "secret_ref": "core_api_key",
+   "requires_key": true,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "articles": true,
+    "fulltext": "yes",
+    "theses": true
+   },
+   "limits": {
+    "per_day": 1000,
+    "note": "Personal 1000/сут и 25/мин; Academic 5000/сут и 10/мин; скачивание PDF в обход API запрещено"
+   },
+   "quota_policy": {
+    "window": "day",
+    "read_headers": [
+     "X-RateLimit-Remaining"
+    ]
+   },
+   "verified_marker": "П",
+   "priority": "P0",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://core.ac.uk/services/api"
+  },
+  {
+   "code": "CON-S2AG",
+   "name": "Semantic Scholar Graph API",
+   "source_name": "Semantic Scholar",
+   "protocol": "REST",
+   "base_url": "https://api.semanticscholar.org/graph/v1",
+   "auth_type": "optional_key",
+   "secret_ref": "s2_api_key",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "articles": true,
+    "citations": true,
+    "tldr": true
+   },
+   "limits": {
+    "rps": 1,
+    "note": "Без ключа ≈100 запросов/5 мин"
+   },
+   "quota_policy": {
+    "window": "second"
+   },
+   "verified_marker": "П",
+   "priority": "P1",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://www.semanticscholar.org/product/api"
+  },
+  {
+   "code": "CON-EPO-OPS",
+   "name": "EPO Open Patent Services 3.2",
+   "source_name": "EPO OPS",
+   "protocol": "REST",
+   "base_url": "https://ops.epo.org/3.2/rest-services",
+   "auth_type": "oauth2",
+   "secret_ref": "epo_ops_key",
+   "requires_key": true,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "patents": true,
+    "legal_status": true,
+    "families": true,
+    "fulltext": "ep_wo"
+   },
+   "limits": {
+    "bytes_per_week": 4294967296,
+    "hard_stop_bytes": 3865470566,
+    "bandwidth_bps": 1000000,
+    "note": "4 ГБ/неделю; жёсткий стоп на 90%; тяжёлые выгрузки 19:00–07:00 GMT (CH-03)"
+   },
+   "quota_policy": {
+    "window": "week_bytes",
+    "night_window_gmt": [
+     19,
+     7
+    ]
+   },
+   "fallback_code": "CON-USPTO-ODP-BULK",
+   "verified_marker": "П",
+   "priority": "P0",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://www.epo.org/en/searching-for-patents/data/web-services/ops"
+  },
+  {
+   "code": "CON-USPTO-ODP",
+   "name": "USPTO Open Data Portal API",
+   "source_name": "USPTO ODP",
+   "protocol": "REST",
+   "base_url": "https://api.uspto.gov/api/v1/patent/applications/search",
+   "auth_type": "api_key",
+   "secret_ref": "uspto_odp_key",
+   "requires_key": true,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "patents": true,
+    "file_wrapper": true,
+    "assignees": true
+   },
+   "limits": {
+    "note": "Ключ: USPTO.gov + ID.me; удаление ключа после 90 дней простоя (CH-04)"
+   },
+   "quota_policy": {
+    "window": "day"
+   },
+   "verified_marker": "П",
+   "priority": "P0",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://developer.uspto.gov/"
+  },
+  {
+   "code": "CON-KIPRIS",
+   "name": "KIPRIS Plus Open API",
+   "source_name": "KIPRIS Plus",
+   "protocol": "REST",
+   "base_url": "http://plus.kipris.or.kr/openapi/rest",
+   "auth_type": "api_key",
+   "secret_ref": "kipris_api_key",
+   "requires_key": true,
+   "paid": false,
+   "implementation": "stub",
+   "capabilities": {
+    "patents": true,
+    "ideas": true
+   },
+   "limits": {
+    "per_month": 1000,
+    "note": "Бесплатно 1000 обращений/мес, далее деградация на OPS (CH-05)"
+   },
+   "quota_policy": {
+    "window": "month"
+   },
+   "fallback_code": "CON-EPO-OPS",
+   "country_code": "KR",
+   "verified_marker": "П",
+   "priority": "P1",
+   "robots_policy": "respect"
+  },
+  {
+   "code": "CON-LENS",
+   "name": "Lens.org Scholarly/Patent API",
+   "source_name": "Lens.org",
+   "protocol": "REST",
+   "base_url": "https://api.lens.org",
+   "auth_type": "contract",
+   "secret_ref": "lens_token",
+   "requires_key": true,
+   "paid": false,
+   "implementation": "stub",
+   "capabilities": {
+    "patents": true,
+    "articles": true,
+    "patcite": true
+   },
+   "limits": {
+    "note": "Институциональная подписка/заявка на trial — класс A2"
+   },
+   "quota_policy": {
+    "window": "month"
+   },
+   "verified_marker": "П",
+   "priority": "P2",
+   "robots_policy": "respect"
+  },
+  {
+   "code": "CON-GITHUB",
+   "name": "GitHub REST Search",
+   "source_name": "GitHub",
+   "protocol": "REST",
+   "base_url": "https://api.github.com",
+   "auth_type": "optional_key",
+   "secret_ref": "github_token",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "live",
+   "capabilities": {
+    "code": true,
+    "discussions": true,
+    "implementation_evidence": true
+   },
+   "limits": {
+    "per_hour": 60,
+    "per_hour_token": 5000
+   },
+   "quota_policy": {
+    "window": "hour"
+   },
+   "verified_marker": "Р",
+   "priority": "P2",
+   "robots_policy": "api_terms",
+   "api_terms_url": "https://docs.github.com/en/rest"
+  },
+  {
+   "code": "CON-WIKIDATA",
+   "name": "Wikidata SPARQL",
+   "source_name": "Wikidata",
+   "protocol": "SPARQL",
+   "base_url": "https://query.wikidata.org/sparql",
+   "auth_type": "none",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "stub",
+   "capabilities": {
+    "terms": true,
+    "organizations": true
+   },
+   "limits": {
+    "note": "Только как вспомогательный источник «Д» для фактов"
+   },
+   "quota_policy": {
+    "window": "second"
+   },
+   "verified_marker": "Р",
+   "priority": "P2",
+   "robots_policy": "respect"
+  },
+  {
+   "code": "CON-ESPACENET-GUI",
+   "name": "Espacenet / European Register (GUI)",
+   "source_name": "Espacenet",
+   "protocol": "GUI",
+   "base_url": "https://worldwide.espacenet.com",
+   "auth_type": "none",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "manual",
+   "enabled": false,
+   "capabilities": {
+    "patents": true
+   },
+   "limits": {
+    "note": "≤10 поисковых действий/мин, роботы запрещены — автоматический сбор заблокирован стоп-листом STOP-03"
+   },
+   "verified_marker": "П",
+   "priority": "P2",
+   "robots_policy": "respect"
+  },
+  {
+   "code": "CON-SIM",
+   "name": "Имитационный коннектор DEV-профиля",
+   "source_name": "SIM",
+   "protocol": "SIM",
+   "base_url": null,
+   "auth_type": "none",
+   "requires_key": false,
+   "paid": false,
+   "implementation": "simulation",
+   "capabilities": {
+    "articles": true,
+    "patents": true,
+    "reports": true
+   },
+   "limits": {},
+   "quota_policy": {},
+   "verified_marker": "Д",
+   "priority": "P0",
+   "notes": "Только DEV. Все документы помечаются simulated=true и не могут быть доказательством FACT.",
+   "robots_policy": "respect"
+  }
+ ]
+}

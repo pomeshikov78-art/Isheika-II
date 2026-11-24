@@ -1,0 +1,40 @@
+{
+ "items": [
+  {
+   "code": "STOP-01",
+   "pattern": "sci-?hub|libgen|зеркал\\w* платн",
+   "reason": "Обход paywall/авторизации запрещён (ТЗ БЕЗ-01)",
+   "action": "block"
+  },
+  {
+   "code": "STOP-02",
+   "pattern": "scholar\\.google|researchgate|linkedin\\.com|academia\\.edu|(^|\\.)x\\.com|twitter\\.com",
+   "reason": "Автоматический сбор запрещён ToS / нет открытого API",
+   "action": "block"
+  },
+  {
+   "code": "STOP-03",
+   "pattern": "worldwide\\.espacenet\\.com|register\\.epo\\.org",
+   "reason": "GUI Espacenet/Register: роботы запрещены EPO, только REST OPS",
+   "action": "block_automation"
+  },
+  {
+   "code": "STOP-04",
+   "pattern": "fileserver-az\\.core\\.ac\\.uk",
+   "reason": "Скачивание PDF CORE в обход API ведёт к блокировке ключа",
+   "action": "block"
+  },
+  {
+   "code": "STOP-05",
+   "pattern": "ГОСТ\\s*РВ|ДСП|для служебного пользования|секретно",
+   "reason": "Материалы ограниченного распространения вне контура системы",
+   "action": "block"
+  },
+  {
+   "code": "STOP-06",
+   "pattern": "контент-ферм|хищническ|predatory|seo-текст",
+   "reason": "Фильтр ПОИСК-10: недостоверные источники",
+   "action": "downgrade"
+  }
+ ]
+}

@@ -1,0 +1,91 @@
+{
+ "graveyard": [
+  {
+   "name": "PatentsView api.patentsview.org",
+   "closed_at": "2026-03-20",
+   "replacement": "USPTO ODP api.uspto.gov",
+   "note": "Старые endpoint'ы подлежат замене"
+  },
+  {
+   "name": "USPTO PEDS / BDSS",
+   "closed_at": "2026-03-20",
+   "replacement": "USPTO ODP + mapping-таблицы",
+   "note": "Выведены из строя"
+  },
+  {
+   "name": "OpenAIRE XML Search API",
+   "closed_at": "2026-05-31",
+   "replacement": "OpenAIRE JSON Graph API",
+   "note": "Остался только Graph API"
+  },
+  {
+   "name": "Cristin (Норвегия)",
+   "closed_at": "2025-12-15",
+   "replacement": "NVA",
+   "note": "API закрыт 19.08.2025"
+  },
+  {
+   "name": "Papers with Code",
+   "closed_at": "2025-07-28",
+   "replacement": "Архивный снапшот Hugging Face",
+   "note": "Живого API нет"
+  },
+  {
+   "name": "Open Access Button / InstantILL",
+   "closed_at": "2025-11-18",
+   "replacement": "Unpaywall / OpenAlex / CORE",
+   "note": "OA-поиск через альтернативы"
+  }
+ ],
+ "critical_changes": [
+  {
+   "id": "CH-01",
+   "subject": "OpenAlex",
+   "change": "Кредитная модель: бесплатный ключ — бюджет $1/сут, 30 req/s; без ключа 10 req/s и только первая страница",
+   "since": "2026",
+   "impact": "quota_scheduler"
+  },
+  {
+   "id": "CH-02",
+   "subject": "Crossref",
+   "change": "Списочные запросы 1 req/s (public) / 3 req/s (polite pool через mailto)",
+   "since": "2026-07-21",
+   "impact": "rate_limit"
+  },
+  {
+   "id": "CH-03",
+   "subject": "EPO OPS",
+   "change": "Бесплатный порог 4 ГБ в НЕДЕЛЮ (не в месяц), ~1 Мбит/с; тяжёлые выгрузки 19:00–07:00 GMT",
+   "since": "2026",
+   "impact": "weekly_byte_budget"
+  },
+  {
+   "id": "CH-04",
+   "subject": "USPTO ODP",
+   "change": "Ключ: аккаунт USPTO.gov + ID.me; ключ удаляется после 90 дней неиспользования; bulk — без ключа",
+   "since": "2026-03-20",
+   "impact": "auth"
+  },
+  {
+   "id": "CH-05",
+   "subject": "KIPRIS Plus",
+   "change": "Бесплатно до 1000 обращений/мес, далее деградация на OPS",
+   "since": "2026",
+   "impact": "monthly_counter"
+  },
+  {
+   "id": "CH-06",
+   "subject": "UKRI GtR",
+   "change": "Новый портал и новый API (ноябрь 2026) — старые инструменты требуют обновления",
+   "since": "2026-11",
+   "impact": "connector_rewrite"
+  },
+  {
+   "id": "CH-07",
+   "subject": "Trove (AU)",
+   "change": "Ограничение выдачи ключей и throttling открытого доступа",
+   "since": "2025",
+   "impact": "fallback"
+  }
+ ]
+}

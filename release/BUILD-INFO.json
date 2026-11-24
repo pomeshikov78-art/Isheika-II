@@ -1,0 +1,84 @@
+{
+  "artifact": "/tmp/arena/tenants/71ebd7cc-b365-41c5-863c-79f587b1df1f/sessions/5e45f2ec-352e-5a19-b6a2-af12bea17743/workspace/isheika/release/ISHEIKA-NTR-AI.exe",
+  "app_version": "1.2.0",
+  "python": "3.11.9",
+  "built_at": "2026-11-23T20:59:14+00:00",
+  "size_bytes": 9906006,
+  "sha256": "17e016793236e41818a2654b5e76d15e2ddf1b093d3713717d527329ed0de556",
+  "sfx": {
+    "file": "/tmp/arena/tenants/71ebd7cc-b365-41c5-863c-79f587b1df1f/sessions/5e45f2ec-352e-5a19-b6a2-af12bea17743/workspace/isheika/tools/vendor/7zSD.sfx",
+    "sha256": "18b4c189f195d55fe1e6c08d6a186d31c89d6c3c55afe122a55230078f7ea294",
+    "size_bytes": 128000
+  },
+  "payload": {
+    "files_in_app": 99,
+    "archive_bytes": 9777655,
+    "config_bytes": 351,
+    "top_level": [
+      "VERSION.txt",
+      "app",
+      "open-browser.cmd",
+      "python",
+      "start.cmd",
+      "ЗАПУСК.txt"
+    ]
+  },
+  "default_port": 8000,
+  "data_dir": "%LOCALAPPDATA%\\IsheikaNTR-AI",
+  "sevenzip": "/usr/bin/7z",
+  "structure": {
+    "mz": true,
+    "pe": true,
+    "machine": "0x14c",
+    "config_offset": 128000,
+    "config_present": true,
+    "run_program": true,
+    "archive_offset": 128351,
+    "archive_signature_ok": true
+  },
+  "wine_check": {
+    "performed": true,
+    "python": [
+      "3.11.9",
+      "3.45.1"
+    ],
+    "port": 8011,
+    "api": 200,
+    "ui": null,
+    "checks": [
+      {
+        "path": "/api/v1/researches",
+        "status": 200,
+        "bytes": 13
+      },
+      {
+        "path": "/api/v1/methodologies",
+        "status": 200,
+        "bytes": 18555
+      },
+      {
+        "path": "/api/v1/sources",
+        "status": 200,
+        "bytes": 124120
+      },
+      {
+        "path": "/",
+        "status": 200,
+        "bytes": 4309
+      }
+    ],
+    "log_tail": "ИЩЕЙКА НТР AI · профиль DEV · http://127.0.0.1:8011\n",
+    "ok": true
+  },
+  "wine_tests": {
+    "performed": true,
+    "returncode": 0,
+    "tail": [
+      "----------------------------------------------------------------------",
+      "Ran 112 tests in 7.118s",
+      "",
+      "OK"
+    ],
+    "ok": true
+  }
+}
