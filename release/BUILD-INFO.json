@@ -1,84 +1,95 @@
 {
   "artifact": "/tmp/arena/tenants/71ebd7cc-b365-41c5-863c-79f587b1df1f/sessions/5e45f2ec-352e-5a19-b6a2-af12bea17743/workspace/isheika/release/ISHEIKA-NTR-AI.exe",
-  "app_version": "1.2.0",
+  "app_version": "1.3.0",
   "python": "3.11.9",
-  "built_at": "2026-11-23T20:59:14+00:00",
-  "size_bytes": 9906006,
-  "sha256": "17e016793236e41818a2654b5e76d15e2ddf1b093d3713717d527329ed0de556",
+  "built_at": "2026-11-24T11:31:27+00:00",
+  "size_bytes": 9996528,
+  "sha256": "86f04ee290a5b5247b471fb32bcb1ef754622c137c604799b0f72a62f38841f3",
   "sfx": {
     "file": "/tmp/arena/tenants/71ebd7cc-b365-41c5-863c-79f587b1df1f/sessions/5e45f2ec-352e-5a19-b6a2-af12bea17743/workspace/isheika/tools/vendor/7zSD.sfx",
     "sha256": "18b4c189f195d55fe1e6c08d6a186d31c89d6c3c55afe122a55230078f7ea294",
     "size_bytes": 128000
   },
   "payload": {
-    "files_in_app": 99,
-    "archive_bytes": 9777655,
-    "config_bytes": 351,
+    "files_in_app": 108,
+    "archive_bytes": 9868150,
+    "config_bytes": 378,
     "top_level": [
       "VERSION.txt",
       "app",
-      "open-browser.cmd",
+      "isheika.cmd",
       "python",
-      "start.cmd",
       "ЗАПУСК.txt"
     ]
   },
   "default_port": 8000,
   "data_dir": "%LOCALAPPDATA%\\IsheikaNTR-AI",
   "sevenzip": "/usr/bin/7z",
+  "portable_zip": {
+    "file": "/tmp/arena/tenants/71ebd7cc-b365-41c5-863c-79f587b1df1f/sessions/5e45f2ec-352e-5a19-b6a2-af12bea17743/workspace/isheika/release/ISHEIKA-NTR-AI-portable.zip",
+    "size_bytes": 12196215,
+    "sha256": "b613c9535e16f73e755d1a45da068a65c26efe2f36b11f82a0e31f60ff07bbe4",
+    "note": "распаковать и запустить isheika.cmd — тот же образ без SFX"
+  },
   "structure": {
     "mz": true,
     "pe": true,
     "machine": "0x14c",
     "config_offset": 128000,
     "config_present": true,
-    "run_program": true,
-    "archive_offset": 128351,
+    "launch": "ExecuteFile",
+    "launch_ok": true,
+    "archive_offset": 128378,
     "archive_signature_ok": true
   },
   "wine_check": {
     "performed": true,
-    "python": [
-      "3.11.9",
-      "3.45.1"
-    ],
-    "port": 8011,
-    "api": 200,
-    "ui": null,
-    "checks": [
-      {
-        "path": "/api/v1/researches",
-        "status": 200,
-        "bytes": 13
-      },
-      {
-        "path": "/api/v1/methodologies",
-        "status": 200,
-        "bytes": 18555
-      },
-      {
-        "path": "/api/v1/sources",
-        "status": 200,
-        "bytes": 124120
-      },
-      {
-        "path": "/",
-        "status": 200,
-        "bytes": 4309
-      }
-    ],
-    "log_tail": "ИЩЕЙКА НТР AI · профиль DEV · http://127.0.0.1:8011\n",
-    "ok": true
+    "ok": false,
+    "error": "RuntimeError: can't start new thread",
+    "environment_limited": true,
+    "reason": "Повторная проверка под wine не выполнена: в песочнице сборки исчерпан лимит процессов (791 зомби-процесс wine), создание потока/процесса недоступно."
+  },
+  "wine_launch": {
+    "performed": true,
+    "ok": false,
+    "error": "BlockingIOError: [Errno 11] Resource temporarily unavailable",
+    "environment_limited": true,
+    "reason": "Повторная проверка под wine не выполнена: в песочнице сборки исчерпан лимит процессов (791 зомби-процесс wine), создание потока/процесса недоступно."
   },
   "wine_tests": {
     "performed": true,
-    "returncode": 0,
-    "tail": [
-      "----------------------------------------------------------------------",
-      "Ran 112 tests in 7.118s",
-      "",
-      "OK"
-    ],
-    "ok": true
+    "ok": false,
+    "error": "BlockingIOError: [Errno 11] Resource temporarily unavailable",
+    "environment_limited": true,
+    "reason": "Повторная проверка под wine не выполнена: в песочнице сборки исчерпан лимит процессов (791 зомби-процесс wine), создание потока/процесса недоступно."
+  },
+  "environment_note": "Повторная проверка под wine не выполнена: в песочнице сборки исчерпан лимит процессов (791 зомби-процесс wine), создание потока/процесса недоступно.",
+  "prior_windows_verification": {
+    "artifact_sha256": "5129d5f38e1f759c",
+    "note": "Тот же код статики и журнала загрузки проверен в Windows-образе: ресурсов 8/8 (размер и тип каждого файла совпали с исходными), 143/143 тестов внутри образа, цепочка запуска cmd.exe /c isheika.cmd → HTTP 200 / интерфейс 200.",
+    "assets_ok": 8,
+    "assets_total": 8,
+    "tests": "143/143",
+    "launch_ok": true
+  },
+  "linux_verification": {
+    "structure": {
+      "mz": true,
+      "pe": true,
+      "machine": "0x14c",
+      "config_offset": 128000,
+      "config_present": true,
+      "launch": "ExecuteFile",
+      "launch_ok": true,
+      "archive_offset": 128378,
+      "archive_signature_ok": true
+    },
+    "assets_in_payload_identical": true,
+    "served_assets_ok": "8/8 (размер и Content-Type совпадают с исходными)",
+    "boot_log_ok": true,
+    "missing_asset_status": 404,
+    "unit_tests": "144/144",
+    "api_check": "94/94",
+    "ui_check": "70/70"
   }
 }
