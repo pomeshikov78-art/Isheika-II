@@ -245,6 +245,38 @@ class ReportTests(BaseCase):
         self.assertIn("html", res["files"])
         self.assertTrue(res["warnings"], "пустой отчёт обязан содержать предупреждения")
 
+    def test_missing_report_file_is_reported_not_linked(self):
+        """RPT-05: запись отчёта переживает сам файл — доступность считает сервер.
+
+        Перенос состояния без каталога var/files (клонирование, восстановление,
+        ручная чистка) оставлял в БД запись со списком форматов. Интерфейс рисовал
+        ссылку на каждый формат, клик по отсутствующему файлу давал голый 404.
+        Теперь сервис отдаёт files_available/missing_files, а UI показывает
+        неактивную кнопку и объяснение вместо ссылки.
+        """
+        from isheika.api import service as S
+        from isheika.reports import builder as RB
+        rid = self.make_research()
+        res = RB.generate(rid, ["html", "json"])
+        row = next(r for r in S.reports(rid) if r["id"] == res["report_id"])
+        self.assertEqual(row["missing_files"], [])
+        self.assertTrue(all(row["files_available"].values()))
+
+        os.remove(res["files"]["html"])
+        row = next(r for r in S.reports(rid) if r["id"] == res["report_id"])
+        self.assertIn("html", row["missing_files"])
+        self.assertFalse(row["files_available"]["html"])
+        self.assertTrue(row["files_available"]["json"])
+        with self.assertRaises(CoreError) as ctx:
+            S.report_file(res["report_id"], "html")
+        self.assertEqual(ctx.exception.error.code, "E_NOT_FOUND")
+
+        # интерфейс обязан опираться на серверную доступность, а не на список форматов
+        from isheika.config import WEB_DIR
+        with open(os.path.join(WEB_DIR, "screens_core.js"), encoding="utf-8") as fh:
+            ui = fh.read()
+        self.assertIn("r.missing_files", ui)
+
     def test_passport_on_empty_research(self):
         from isheika.analytics import passport as P
         rid = self.make_research()

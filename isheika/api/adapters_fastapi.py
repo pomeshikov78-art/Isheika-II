@@ -31,7 +31,9 @@ from .server import ROUTES, PUBLIC_PATHS
 
 db.init_db()
 loader.seed_all()
-app = FastAPI(title="ИЩЕЙКА НТР AI", version="1.2.0")
+from .. import __version__
+
+app = FastAPI(title="ИЩЕЙКА НТР AI", version=__version__)
 
 
 @app.middleware("http")

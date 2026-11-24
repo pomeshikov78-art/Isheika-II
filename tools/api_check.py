@@ -61,6 +61,9 @@ def main() -> int:
     args = ap.parse_args()
     c = Client(args.base)
     results: list[tuple[bool, str, int, str]] = []
+    # Проверки, которые нельзя выполнить из-за состояния данных, а не из-за дефекта:
+    # например, запись отчёта есть, а файл не перенесён вместе с состоянием.
+    skipped: list[tuple[str, str]] = []
 
     rights: set[str] = set()
 
@@ -82,9 +85,19 @@ def main() -> int:
         results.append((ok, f"{method} {name}", code, note))
         return obj
 
-    # --- статика UI
-    for f in ("/", "/styles.css", "/app.js", "/charts.js", "/screens_core.js", "/screens_registry.js", "/screens_v11.js"):
+    # --- статика UI: тип содержимого обязан соответствовать расширению
+    import os as _os
+    web = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "isheika", "web")
+    for f in ("/", "/styles.css", "/app.js", "/charts.js", "/screens_core.js", "/screens_registry.js",
+              "/screens_v11.js", "/screens_ops.js"):
         check(f, "GET", f, raw=True)
+        ok, code, obj, ctype = c.call("GET", f, expect=200, raw=True)
+        name = "index.html" if f == "/" else f[1:]
+        want = "text/html" if name.endswith(".html") else ("text/css" if name.endswith(".css") else "application/javascript")
+        size_ok = isinstance(obj, int) and obj == _os.path.getsize(_os.path.join(web, name))
+        results.append((ctype.startswith(want) and size_ok, f"тип и размер {name}", code,
+                        f"{ctype.split(';')[0]}, {obj} Б"))
+    check("несуществующий ресурс → 404", "GET", "/no-such-file.js", expect=404)
 
     # --- аутентификация и RBAC
     check("auth/login (неверный пароль)", "POST", "/api/v1/auth/login",
@@ -142,7 +155,12 @@ def main() -> int:
         reps = c.call("GET", f"/api/v1/reports?research_id={rid}")[2]
         if isinstance(reps, dict) and reps.get("items"):
             r0 = reps["items"][0]
+            avail = r0.get("files_available") or {}
             for fmt in list((r0.get("files") or {}).keys())[:3]:
+                if avail and not avail.get(fmt, True):
+                    skipped.append((f"GET reports/file?fmt={fmt}",
+                                    "файл не перенесён вместе с состоянием — перегенерируйте: --run"))
+                    continue
                 check(f"reports/file?fmt={fmt}", "GET", f"/api/v1/reports/{r0['id']}/file?fmt={fmt}", raw=True, right="research.read")
         check("logs/export", "GET", f"/api/v1/logs/export?research_id={rid}&fmt=csv", raw=True, right="logs.read")
         # --- каталог v1.1 (ИД-04) и новые ресурсы
@@ -191,6 +209,74 @@ def main() -> int:
                      r.headers.get("X-Correlation-ID") == "cid-apicheck-0001"
         results.append((hdr_ok, "заголовки X-Request-ID / X-Correlation-ID", 200,
                         "проброшены" if hdr_ok else "не проброшены"))
+        # --- ROADMAP P6 (ред. 1.3): SLO, алерты, резервные копии
+        slo = check("slo", "GET", "/api/v1/slo", right="logs.read")
+        if isinstance(slo, dict) and slo.get("windows"):
+            w = {x["window"]: x for x in slo["windows"]}
+            consistent = all(x["state"] == "NO_DATA" or (0 <= x["availability_pct"] <= 100)
+                             for x in slo["windows"]) and slo["target_pct"] == 98.0
+            results.append((consistent, "SLO: окна 24h/7d/30d и цель 98 %", 200,
+                            f"30d={w.get('30d', {}).get('availability_pct')}"))
+        check("slo/probes", "POST", "/api/v1/slo/probes", {}, right="settings.read")
+        al = check("alerts", "GET", "/api/v1/alerts", right="logs.read")
+        check("alerts/evaluate", "POST", "/api/v1/alerts/evaluate", {}, right="settings.read")
+        open_alert = next((a for a in (al or {}).get("items", []) if a.get("state") == "open"), None)
+        if open_alert:
+            check("alerts/{id}/acknowledge", "POST",
+                  f"/api/v1/alerts/{open_alert['id']}/acknowledge", {}, right="settings.read")
+        check("alerts/{id}/acknowledge (нет такого) → 404", "POST",
+              "/api/v1/alerts/alr-none/acknowledge", {},
+              expect=404 if need("settings.read") == 200 else 403)
+        bk = check("backups", "GET", "/api/v1/backups", right="logs.read")
+        made = check("backups (создание)", "POST", "/api/v1/backups", {"kind": "api_check"}, right="keys.write")
+        if isinstance(made, dict) and made.get("backup"):
+            results.append((bool(made["verify"]["ok"]), "копия прошла проверку целостности", 200,
+                            f"{made['backup']['size_bytes']} Б"))
+            check("backups/{id}/verify", "POST", f"/api/v1/backups/{made['backup']['id']}/verify", {},
+                  right="logs.read")
+        check("backups/{id}/verify (нет такой) → 404", "POST", "/api/v1/backups/bkp-none/verify", {},
+              expect=404 if need("logs.read") == 200 else 403)
+        # --- журнал загрузки и самопроверка (доступен без токена)
+        bl = check("boot-log", "GET", "/api/v1/boot-log")
+        if isinstance(bl, dict):
+            results.append((bool(bl.get("ok")), "самопроверка запуска исправна", 200,
+                            f"шагов {len(bl.get('steps', []))}, проверок {len(bl.get('checks', []))}"))
+            assets_ok = all(a["ok"] for a in bl.get("assets", [])) and bool(bl.get("assets"))
+            results.append((assets_ok, "ресурсы интерфейса в журнале загрузки", 200,
+                            f"{len(bl.get('assets', []))} ресурсов"))
+        # --- журнал действий и поиск противоречий (ред. 1.4.0)
+        jrn = check("journal", "GET", "/api/v1/journal?limit=20", right="logs.read")
+        if isinstance(jrn, dict) and "items" in jrn:
+            results.append((bool(jrn.get("total", 0) > 0), "журнал действий пишется во время работы", 200,
+                            f"записей {jrn['total']}, уровней {len(jrn.get('levels', []))}"))
+        check("journal?level=error", "GET", "/api/v1/journal?level=error&limit=10", right="logs.read")
+        check("journal?kind=api", "GET", "/api/v1/journal?kind=api&limit=10", right="logs.read")
+        check("journal/stats", "GET", "/api/v1/journal/stats", right="logs.read")
+        errs = check("journal/errors", "GET", "/api/v1/journal/errors", right="logs.read")
+        if isinstance(errs, dict) and errs.get("items"):
+            fp = errs["items"][0]["fingerprint"]
+            check("journal?fingerprint", "GET", f"/api/v1/journal?fingerprint={fp}&limit=5", right="logs.read")
+        for fmt in ("txt", "json", "csv"):
+            check(f"journal/export?fmt={fmt}", "GET", f"/api/v1/journal/export?fmt={fmt}&limit=50",
+                  raw=True, right="logs.read")
+        diag = check("diagnostics", "GET", "/api/v1/diagnostics", right="logs.read")
+        if isinstance(diag, dict) and "findings" in diag:
+            results.append((not diag.get("broken_rules"), "правила поиска противоречий выполняются", 200,
+                            f"правил {diag['rules']}, противоречий {len(diag['findings'])}, "
+                            f"сломанных {len(diag.get('broken_rules') or [])}"))
+        check("diagnostics/run", "POST", "/api/v1/diagnostics/run", {}, right="logs.read")
+        if isinstance(jrn, dict) and jrn.get("items"):
+            jid = jrn["items"][0]["id"]
+            entry = check("journal/{id}", "GET", f"/api/v1/journal/{jid}", right="logs.read")
+            if isinstance(entry, dict):
+                results.append(("context" in entry, "запись журнала отдаёт контекст трассировки", 200,
+                                f"записей контекста {len(entry.get('context') or [])}"))
+        check("journal/{id} (нет такой) → 404", "GET", "/api/v1/journal/jrn-none",
+              expect=404 if need("logs.read") == 200 else 403)
+        check("journal/prune", "POST", "/api/v1/journal/prune", {}, right="settings.read")
+        check("boot-log/history", "GET", "/api/v1/boot-log/history", right="logs.read")
+        check("boot-log/export txt", "GET", "/api/v1/boot-log/export?fmt=txt", raw=True)
+        check("boot-log/export json", "GET", "/api/v1/boot-log/export?fmt=json", raw=True)
         check("openapi.json", "GET", "/api/v1/openapi.json")
         check("metrics (Prometheus)", "GET", "/metrics", raw=True)
         # --- ИД-04: устаревший маршрут обязан вернуть 410 Gone
@@ -232,6 +318,17 @@ def main() -> int:
     check("несуществующее исследование → 404", "GET", "/api/v1/researches/res-does-not-exist", expect=404)
     check("несуществующий маршрут → 404", "GET", "/api/v1/nope", expect=404)
 
+    # --- ошибка интерфейса из браузера: принимается и до входа (ред. 1.4.0)
+    anon_j = Client(args.base)
+    ok, code, obj, _ = anon_j.call("POST", "/api/v1/journal/client",
+                                   {"level": "error", "kind": "ui", "action": "api_check.browser",
+                                    "message": "Проверка приёма ошибок интерфейса", "route": "#/api-check"})
+    results.append((code == 200 and isinstance(obj, dict) and obj.get("accepted"),
+                    "POST journal/client без токена", code,
+                    "принято" if code == 200 else str(obj)[:70]))
+    ok, code, obj, _ = anon_j.call("POST", "/api/v1/journal/client", {"level": "error"}, expect=422)
+    results.append((code == 422, "POST journal/client без сообщения → 422", code, "ожидается 422"))
+
     # --- анонимный доступ
     anon = Client(args.base)
     ok, code, obj, _ = anon.call("GET", "/api/v1/researches", expect=401)
@@ -252,12 +349,15 @@ def main() -> int:
         sse_note = str(e)[:70]
     results.append((sse_ok, "GET events/stream (SSE)", 200 if sse_ok else 0, sse_note))
 
-    width = max(len(n) for _, n, _, _ in results)
+    width = max([len(n) for _, n, _, _ in results] + [len(n) for n, _ in skipped])
     passed = 0
     for ok, name, code, note in results:
         passed += bool(ok)
         print(f'{"OK " if ok else "FAIL"} {name.ljust(width)}  {code}  {note}')
-    print(f"\nИтого: {passed}/{len(results)} проверок пройдено")
+    for name, why in skipped:
+        print(f'SKIP {name.ljust(width)}  ---  {why}')
+    tail = f", пропущено {len(skipped)} (состояние данных)" if skipped else ""
+    print(f"\nИтого: {passed}/{len(results)} проверок пройдено{tail}")
     return 0 if passed == len(results) else 1
 
 

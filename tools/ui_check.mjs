@@ -42,7 +42,38 @@ await App.loadResearches(true);
 window.document.getElementById('login').hidden = true;
 window.document.getElementById('app').hidden = false;
 
+// Экраны документов, дедупликации и графа связей требуют исследование С документами.
+// Самое свежее исследование может быть пустым (например, создано проверкой API),
+// поэтому выбираем первое, где документы есть, — иначе проверка зависит от порядка прогонов.
+for (const r of App.S.researches) {
+  const probe = await App.get('/api/v1/documents', {research_id: r.id, limit: 1});
+  if ((probe.items || []).length) { App.setResearch(r.id, true); break; }
+}
+const hasDocs = App.S.researchId &&
+  ((await App.get('/api/v1/documents', {research_id: App.S.researchId, limit: 1})).items || []).length > 0;
+
+// Чистая установка (например, только что распакованный образ): исследований нет.
+// Раньше проверка падала на 422 «Не указан research_id» — вместо этого создаём
+// демо-исследование и дожидаемся этапов, чтобы экраны имели данные.
+if (!hasDocs) {
+  console.log('Исследований нет — создаю демо-исследование для проверки экранов…');
+  const created = await App.post('/api/v1/researches', {
+    query: 'тропосферная связь за горизонтом', title: 'Проверка интерфейса',
+    countries: ['RU', 'US', 'CN'], settings: {max_docs_per_source: 4},
+  });
+  await App.post(`/api/v1/researches/${created.id}/start`, {});
+  for (let waited = 0; waited < 240000; waited += 4000) {
+    await sleep(4000);
+    const st = await App.get(`/api/v1/researches/${created.id}/status`);
+    const jobs = st.jobs || [];
+    const done = jobs.filter(j => ['completed', 'failed', 'cancelled', 'partial'].includes(j.status)).length;
+    if (!st.running && done === jobs.length) break;
+  }
+  await App.loadResearches(true);
+}
+
 const rid = App.S.researchId;
+if (!rid) { console.error('Не удалось подготовить исследование для проверки экранов'); process.exit(1); }
 const docs = await App.get('/api/v1/documents', {research_id: rid, limit: 1});
 const did = docs.items?.[0]?.id;
 
@@ -59,7 +90,11 @@ const routes = [
   ['consensus', {}], ['consensus', {tab: 'critic'}], ['evidence', {}],
   ['report', {}], ['report', {tab: 'export'}],
   ['sources', {}], ['countries', {}], ['monitor', {}], ['logs', {}],
+  ['ops', {}], ['ops', {tab: 'alerts'}], ['ops', {tab: 'backups'}],
   ['settings', {}], ['settings', {tab: 'keys'}], ['settings', {tab: 'users'}], ['quality', {}],
+  // ред. 1.4.0: журнал действий и поиск противоречий (UI-32)
+  ['journal', {}], ['journal', {tab: 'errors'}], ['journal', {tab: 'contradictions'}],
+  ['journal', {tab: 'browser'}], ['journal', {level: 'error'}], ['journal', {kind: 'api'}],
   // экраны редакции v1.1 (ИД-03, ИД-09, ИД-11, ИД-12)
   ['methodologies', {}], ['methodologies', {code: 'FEASIBILITY_V1'}],
   ['independence', {}], ['dedup', {}], ['dedup', {tab: 'graph'}],
@@ -162,6 +197,101 @@ if (cid) {
   extra.push([false, 'трассировка: события с correlation_id', 'нет событий с трассировкой']);
 }
 
+// --- журнал загрузки: экран диагностики вместо «белого экрана»
+const B = window.__isheikaBoot;
+t('журнал загрузки: объект диагностики есть', () => !!B && Array.isArray(B.steps) && B.steps.length > 0);
+// Регрессия BOOT-08: `const Charts` — лексическая привязка, а не свойство window;
+// диагностика проверяла window.Charts и выдавала ложный FAIL на рабочем интерфейсе.
+t('модуль Charts опубликован в window', () => !!window.Charts && typeof window.Charts.line === 'function');
+t('Charts рисует SVG из данных', () => {
+  const html = window.Charts.range(52, 40, 66);
+  return html.includes('<svg') && html.includes('52%');
+});
+t('журнал загрузки: отказов при загрузке нет', () => {
+  const bad = B.steps.filter(s => s.status === 'fail').map(s => s.step + ': ' + s.detail);
+  return bad.length === 0 || bad.join(' | ');
+});
+t('журнал загрузки: сценарии отмечены', () => {
+  const names = B.steps.map(s => s.step).join('|');
+  return ['charts.js', 'screens_ops.js', 'app.js'].every(n => names.includes(n));
+});
+t('журнал загрузки: журнал сервера получен', () => !!B.server && Array.isArray(B.server.checks) && B.server.checks.length > 0);
+t('журнал загрузки: отказ показывает экран диагностики', () => {
+  B.log('Проверка диагностики', 'fail', 'искусственный отказ');
+  const w = window.document.getElementById('boot');
+  const shown = w && w.hidden === false && w.innerHTML.includes('Проверка диагностики');
+  B.steps.pop(); B.failed = false; w.hidden = true;      // возвращаем состояние
+  return shown;
+});
+t('журнал загрузки: выгрузка содержит шаги', () => B.text().includes('журнал загрузки браузера') && B.text().includes('App'));
+// Регрессия BOOT-09: отказ диагностики не должен запирать работоспособный интерфейс.
+t('журнал загрузки: отказ закрывается кнопкой', () => {
+  const w = window.document.getElementById('boot');
+  const btn = window.document.getElementById('boot-continue');
+  if (!btn) return 'кнопка «Продолжить работу» отсутствует';
+  B.log('Проверка закрытия', 'fail', 'искусственный отказ');
+  const shown = w.hidden === false;
+  btn.click();
+  const closed = w.hidden === true && B.dismissed === true;
+  B.steps.pop(); B.failed = false; B.dismissed = false;   // возвращаем состояние
+  return shown && closed ? true : `показан=${shown}, закрыт=${closed}`;
+});
+await App.bootLogModal();
+await sleep(900);
+t('журнал загрузки: окно самопроверки открывается', () => {
+  const m = window.document.getElementById('modal-body');
+  return !!m && m.innerHTML.includes('Самопроверка') && m.innerHTML.includes('Ресурсы интерфейса');
+});
+App.closeModal();
+
+t('версия в шапке берётся с сервера', () => {
+  const el = window.document.getElementById('app-ver');
+  return !!el && el.textContent.includes(App.S.system.version) && !el.textContent.includes('v0.1');
+});
+// --- ред. 1.4.0: журнал действий, ошибки и противоречия
+App.go('journal', {});
+await sleep(1500);
+t('журнал действий: лента отрисована', () => window.document.querySelectorAll('#j-tbl tbody tr').length > 0);
+t('журнал действий: фильтр по уровню применяется', () => {
+  const sel = window.document.getElementById('j-level');
+  if (!sel) return 'селектор уровня отсутствует';
+  sel.value = 'error';
+  window.document.getElementById('j-apply').click();
+  return true;
+});
+await sleep(1500);
+t('журнал действий: в ленте только ошибки', () => {
+  const html = window.document.getElementById('screen-body').innerHTML;
+  if (html.includes('Записей по фильтру нет')) return true;
+  const rows = [...window.document.querySelectorAll('#j-tbl tbody tr')];
+  if (!rows.length) return 'лента пуста без сообщения о пустом фильтре';
+  const bad = rows.filter(r => !/ошибка|критично/.test(r.children[1]?.textContent || ''));
+  return bad.length === 0 ? true : `не-ошибок в ленте: ${bad.length}`;
+});
+t('журнал действий: выгрузка CSV подготовлена', () => {
+  const a = [...window.document.querySelectorAll('a')].find(x => (x.getAttribute('href') || '').includes('journal/export'));
+  return !!a && a.getAttribute('href').includes('fmt=');
+});
+App.go('journal', {tab: 'contradictions'});
+await sleep(1800);
+t('противоречия: правила показаны', () => {
+  const html = window.document.getElementById('screen-body').innerHTML;
+  return html.includes('Правил проверки') && !html.includes('spinner');
+});
+t('противоречия: кнопка проверки есть', () => !!window.document.getElementById('dg-run'));
+// Ошибка интерфейса должна дойти до сервера и вернуться в экран «Браузер».
+App.reportClient({action: 'ui_check.test', message: 'Проверка журнала ошибок интерфейса',
+                  type: 'TestError', stack: 'at ui_check (tools/ui_check.mjs:1)'});
+await sleep(900);
+const browserEvents = await App.get('/api/v1/journal', {source: 'browser', limit: 50});
+t('ошибка интерфейса сохранена на сервере', () =>
+  (browserEvents.items || []).some(e => e.action === 'ui_check.test') || 'событие не найдено в журнале');
+App.go('journal', {tab: 'errors'});
+await sleep(1500);
+t('ошибки: группировка по подписи дефекта', () => {
+  const html = window.document.getElementById('screen-body').innerHTML;
+  return html.includes('Подпись') || html.includes('Ошибок не зафиксировано');
+});
 App.setTheme('dark');
 t('тёмная тема применяется', () => window.document.documentElement.dataset.theme === 'dark');
 App.setTheme('light');

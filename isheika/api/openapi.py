@@ -14,7 +14,7 @@ CANONICAL = [
     "/api/v1/feasibility-assessments", "/api/v1/forecasts", "/api/v1/ai-tasks", "/api/v1/reports",
     "/api/v1/events", "/api/v1/methodologies", "/api/v1/confidence-assessments",
     "/api/v1/document-clusters", "/api/v1/document-relations", "/api/v1/independence-groups",
-    "/api/v1/research-runs",
+    "/api/v1/research-runs", "/api/v1/journal", "/api/v1/diagnostics",
 ]
 
 TAGS = {
@@ -25,6 +25,7 @@ TAGS = {
     "reports": "Отчёты", "events": "События", "methodologies": "Методики",
     "document-clusters": "Кластеры документов", "document-relations": "Связи документов",
     "independence-groups": "Независимость доказательств", "research-runs": "Запуски и воспроизводимость",
+    "journal": "Журнал действий", "diagnostics": "Диагностика противоречий",
 }
 
 ERROR_SCHEMA = {

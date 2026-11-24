@@ -47,6 +47,7 @@ class Settings:
     ai_mode: str = "auto"                      # auto | simulation | live
     # --- политика сети (ТЗ-01 §5)
     network_enabled: bool = True
+    slo_scheduler: bool = True          # фоновые самопроверки доступности (P6)
     respect_robots: bool = True
     http_timeout: float = 20.0
     max_parallel_fetch: int = 8
@@ -58,6 +59,13 @@ class Settings:
     relevance_direct: float = 0.80
     relevance_adjacent: float = 0.60
     methodology_version: str = "M-1.0.0"
+    # --- журнал действий времени работы (ред. 1.4.0)
+    journal_enabled: bool = True               # сквозной журнал действий и отказов
+    journal_level: str = "info"                # минимальный записываемый уровень (debug|info|warn|error|critical)
+    journal_retention_days: int = 30           # политика хранения: срок
+    journal_max_rows: int = 200000             # политика хранения: предельный объём
+    journal_client_rate: int = 60              # событий браузера в минуту с одного адреса
+    journal_stack_in_response: bool = False    # traceback в ответе API — только для отладки (утечка деталей)
     # --- API v1.1 (ИД-04): единый каталог маршрутов, срок совместимости старых путей
     api_legacy_compat: bool = False
     api_legacy_sunset: str = "2027-05-24"

@@ -42,6 +42,25 @@ def emit(event_type: str, *, research_id: str | None = None, job_id: str | None 
         ev["seq"] = row["seq"] if row else None
     except Exception:
         pass
+    # Журнал действий: предупреждения и отказы этапов/ИИ должны быть находимы
+    # фильтром по уровню и подписи дефекта, а не только в ленте конкретного запуска.
+    if severity in ("warning", "warn", "error", "critical"):
+        try:
+            from .. import journal
+            kind = ("ai" if event_type.startswith(("ai.", "consensus.")) else
+                    "analytics" if event_type.startswith(("analytics.", "forecast.", "quality.")) else
+                    "connector" if event_type.startswith("search.") else
+                    "workflow" if event_type.startswith(("job.", "research.")) else "system")
+            data = payload or {}
+            journal.record("warn" if severity in ("warning", "warn") else "error",
+                           kind, event_type, message=str(data.get("message") or data.get("reason") or ""),
+                           source="workflow", research_id=research_id, job_id=job_id,
+                           outcome="fail" if severity in ("error", "critical") else "warn",
+                           error_code=data.get("error_code") or data.get("code"),
+                           error_type=data.get("error_type"), stack=data.get("traceback") or data.get("trace"),
+                           duration_ms=data.get("duration_ms"), detail=data)
+        except Exception:
+            pass
     with _LOCK:
         for q in list(_SUBSCRIBERS):
             try:

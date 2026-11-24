@@ -93,6 +93,18 @@ def audit(actor: str, action: str, kind: str | None = None, entity_id: str | Non
                                 "payload": payload or {}, "created_at": iso_now()})
     except Exception:
         pass
+    # Журнал действий (ред. 1.4.0): то же действие в сквозном журнале — с исходом,
+    # длительностью и подписью дефекта, чтобы отказ искался фильтром, а не глазами.
+    try:
+        from .. import journal
+        failed = bool(http_status and http_status >= 400) or (payload or {}).get("outcome") == "fail"
+        journal.record("warn" if failed else "info", "action", action,
+                       message=str((payload or {}).get("message") or ""),
+                       actor=actor, research_id=research_id, entity_kind=kind, entity_id=entity_id,
+                       http_status=http_status, duration_ms=duration_ms,
+                       outcome="fail" if failed else "ok", detail=payload or {})
+    except Exception:
+        pass
 
 
 # ------------------------------------------------------------------ исследования
@@ -807,8 +819,22 @@ def generate_report(rid: str, formats: list[str] | None = None, *, actor: str = 
 
 
 def reports(rid: str) -> list[dict]:
-    return [db.dec(r, "formats", "files", "warnings") for r in
-            db.query("SELECT * FROM reporting_reports WHERE research_id=? ORDER BY created_at DESC", (rid,))]
+    """Отчёты исследования с фактической доступностью файлов.
+
+    Запись в БД переживает сам файл: клонирование состояния без var/files,
+    восстановление из копии, ручная чистка каталога. Раньше интерфейс рисовал
+    ссылку на каждый формат из записи, и клик по отсутствующему файлу давал
+    голый 404 (замечание TOOL-03). Теперь доступность считается на сервере:
+    `files_available` по форматам и `missing_files` списком.
+    """
+    out = []
+    for r in db.query("SELECT * FROM reporting_reports WHERE research_id=? ORDER BY created_at DESC", (rid,)):
+        item = db.dec(r, "formats", "files", "warnings")
+        avail = {fmt: os.path.exists(path) for fmt, path in (item.get("files") or {}).items()}
+        item["files_available"] = avail
+        item["missing_files"] = sorted(f for f, ok in avail.items() if not ok)
+        out.append(item)
+    return out
 
 
 def report_file(report_id: str, fmt: str) -> str:
@@ -886,10 +912,129 @@ def logs_export(research_id: str | None, fmt: str = "json") -> str:
     return "\n".join(lines)
 
 
+# ------------------------------------------------------------------ журнал действий (ред. 1.4.0)
+def journal_list(**filters) -> dict:
+    from .. import journal
+    return journal.query(**filters)
+
+
+def journal_entry(journal_id: str) -> dict:
+    from .. import journal
+    return journal.entry(journal_id)
+
+
+def journal_errors(limit: int = 50, since: str | None = None) -> dict:
+    from .. import journal
+    return journal.errors(limit=limit, since=since)
+
+
+def journal_stats() -> dict:
+    from .. import journal
+    return journal.stats()
+
+
+def journal_export(fmt: str = "txt", **filters) -> str:
+    from .. import journal
+    return journal.export(fmt, **filters)
+
+
+def journal_client(body: dict, *, peer: str = "", session: dict | None = None,
+                   user_agent: str = "") -> dict:
+    """Ошибка интерфейса, присланная браузером (доступно и до входа)."""
+    from .. import journal
+    sess = session or {}
+    return journal.client_event(body, peer=peer, actor=sess.get("login"),
+                                role=sess.get("role"), user_agent=user_agent)
+
+
+def journal_prune(*, actor: str = "system", days: int | None = None,
+                  max_rows: int | None = None) -> dict:
+    from .. import journal
+    res = journal.prune(days=days, max_rows=max_rows)
+    audit(actor, "journal.prune", "journal", None, None, res)
+    return res
+
+
+def diagnostics_run(research_id: str | None = None, *, to_journal: bool = False,
+                    actor: str = "system") -> dict:
+    """Поиск противоречий: расхождений с ТЗ, а не мнений модели."""
+    from .. import diagnostics
+    res = diagnostics.run(research_id=research_id, to_journal=to_journal, actor=actor)
+    if to_journal:
+        audit(actor, "diagnostics.run", "diagnostics", None, research_id,
+              {"findings": len(res["findings"]), "cases": res["cases"]})
+    return res
+
+
+# ------------------------------------------------------------------ эксплуатация (P6, ред. 1.3)
+def slo_report() -> dict:
+    from .. import slo
+    return slo.report()
+
+
+def slo_probes_run(*, actor: str = "system") -> dict:
+    from .. import slo
+    probes = slo.run_probes()
+    res = slo.evaluate_alerts(actor=actor)
+    audit(actor, "slo.probes", "system", None, payload={"probes": len(probes),
+                                                       "opened": len(res["opened"])})
+    return {"probes": probes, "opened": res["opened"], "closed": res["closed"],
+            "report": slo.report()}
+
+
+def alerts_list(state: str = "active", limit: int = 200) -> dict:
+    from .. import slo
+    items = slo.alerts(state=state, limit=limit)
+    return {"items": items, "total": len(items),
+            "rules": {code: {"severity": r["severity"], "title": r["title"]} for code, r in slo.RULES.items()}}
+
+
+def alerts_evaluate(*, actor: str = "system") -> dict:
+    from .. import slo
+    res = slo.evaluate_alerts(actor=actor)
+    audit(actor, "alerts.evaluate", "system", None, payload={"opened": len(res["opened"]),
+                                                             "closed": len(res["closed"])})
+    return res
+
+
+def alert_acknowledge(alert_id: str, *, actor: str = "system") -> dict:
+    from .. import slo
+    row = slo.acknowledge(alert_id, actor=actor)
+    audit(actor, "alert.acknowledge", "alert", alert_id)
+    return row
+
+
+def backups_list() -> dict:
+    from .. import backup as BK
+    items = BK.list_backups()
+    return {"items": items, "total": len(items),
+            "policy": {"max_age_hours": __import__("isheika.slo", fromlist=["x"]).BACKUP_MAX_AGE_HOURS,
+                       "note": "Восстановление выполняется из CLI при остановленном сервере."}}
+
+
+def backup_create(*, actor: str = "system", kind: str = "manual") -> dict:
+    from .. import backup as BK
+    row = BK.create(actor=actor, kind=kind)
+    check = BK.verify(row["path"])
+    audit(actor, "backup.create", "backup", row["id"], payload={"size_bytes": row["size_bytes"],
+                                                                "verified": check["ok"]})
+    events.emit("system.warning", payload={"action": "backup.created", "backup_id": row["id"],
+                                           "verified": check["ok"]})
+    return {"backup": row, "verify": {"ok": check["ok"], "checks": check["checks"]}}
+
+
+def backup_verify(backup_id: str, *, actor: str = "system") -> dict:
+    from .. import backup as BK
+    path = BK.resolve(backup_id)
+    res = BK.verify(path)
+    audit(actor, "backup.verify", "backup", backup_id, payload={"ok": res["ok"]})
+    return res
+
+
 def system_state() -> dict:
     from ..search import quota
     return {
-        "app": "ИЩЕЙКА НТР AI", "codename": "ISHEIKA-NTR-AI", "version": "1.2.0",
+        "app": "ИЩЕЙКА НТР AI", "codename": "ISHEIKA-NTR-AI", "version": __import__("isheika").__version__,
         "api_version": "v1", "methodology_version": SETTINGS.methodology_version,
         "profile": SETTINGS.profile, "settings": SETTINGS.public_dict(),
         "counters": {

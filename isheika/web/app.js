@@ -45,18 +45,34 @@ const App = (() => {
     if (idem) headers['Idempotency-Key'] = idem;
     if (S.researchId) headers['X-Correlation-ID'] = S.researchId;
     let res;
+    const limit = opts.timeout || 45000;
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), limit) : null;
     try {
-      res = await fetch(url.toString(), {method, headers, body: body !== undefined ? JSON.stringify(body) : undefined});
+      res = await fetch(url.toString(), {method, headers, body: body !== undefined ? JSON.stringify(body) : undefined,
+                                         signal: ctrl ? ctrl.signal : undefined});
     } catch (e) {
       S.online = false; paintConn();
-      throw {code: 'E_NETWORK', message: 'Сервер недоступен. Проверьте соединение — данные могли устареть.', request_id: rid, offline: true};
-    }
+      const timedOut = ctrl && ctrl.signal.aborted;
+      const netErr = {code: 'E_NETWORK',
+             message: timedOut ? 'Сервер не ответил за ' + Math.round(limit / 1000) + ' с: ' + path
+                               : 'Сервер недоступен. Проверьте соединение — данные могли устареть.',
+             request_id: rid, offline: true};
+      reportClient({action: 'api.' + method + ' ' + path, message: netErr.message, code: 'E_NETWORK',
+                    type: timedOut ? 'TimeoutError' : 'NetworkError'});
+      throw netErr;
+    } finally { if (timer) clearTimeout(timer); }
     S.online = true; S.lastSync = new Date(); paintConn();
     let data = {};
     try { data = await res.json(); } catch (e) { data = {}; }
     if (!res.ok) {
       const err = (data && data.error) || {code: 'E_INTERNAL', message: 'HTTP ' + res.status};
       err.http = res.status; err.request_id = err.request_id || rid;
+      // В журнал — то, что похоже на дефект, а не на ожидаемый отказ прав/валидации.
+      if (res.status >= 500 || ['E_INTERNAL', 'E_SCHEMA', 'E_PROVIDER'].includes(err.code)) {
+        reportClient({action: 'api.' + method + ' ' + path, message: err.message, code: err.code,
+                      type: 'ApiError', detail: {http: res.status, request_id: err.request_id}});
+      }
       if (res.status === 401 && S.user) { toast('Сессия истекла — требуется повторный вход', 'warn'); logout(false); }
       throw err;
     }
@@ -65,6 +81,50 @@ const App = (() => {
   const get = (p, query) => api(p, {query});
   const post = (p, body, idem) => api(p, {method: 'POST', body: body || {}, idem});
   const del = p => api(p, {method: 'DELETE'});
+
+  // ---------------------------------------------------------------- журнал действий (ред. 1.4.0)
+  /* Ошибки интерфейса уходят на сервер: раньше они жили только в памяти вкладки
+     и терялись при перезагрузке — найти дефект у пользователя было нечем.
+     Отправка идёт напрямую через fetch (не через api), чтобы отказ самого
+     журнала не порождал новую запись об отказе. */
+  let jrnSent = 0, jrnMuted = false;
+  function reportClient(ev) {
+    if (jrnMuted || jrnSent >= 60) return;
+    jrnSent += 1;
+    const payload = {
+      level: ev.level || 'error', kind: ev.kind || 'ui', action: ev.action || 'browser.event',
+      message: String(ev.message || '').slice(0, 1200),
+      stack: ev.stack ? String(ev.stack).slice(0, 6000) : '',
+      error_code: ev.code || '', error_type: ev.type || '',
+      route: location.hash || '', screen: S.route || '', url: location.pathname,
+      research_id: S.researchId || '', app_version: (S.system && S.system.version) || '',
+      viewport: (window.innerWidth || 0) + 'x' + (window.innerHeight || 0),
+      boot_id: (window.__isheikaBoot && window.__isheikaBoot.server && window.__isheikaBoot.server.boot_id) || '',
+      detail: ev.detail || {},
+    };
+    try {
+      const headers = {'Content-Type': 'application/json'};
+      if (S.token) headers['Authorization'] = 'Bearer ' + S.token;
+      const p = fetch('api/v1/journal/client', {method: 'POST', headers, keepalive: true,
+                                               body: JSON.stringify(payload)});
+      if (p && p.catch) p.catch(() => { jrnMuted = true; });   // сервер недоступен — не шумим
+    } catch (e) { jrnMuted = true; }
+  }
+  window.addEventListener('error', e => {
+    if (e && e.target && e.target !== window && (e.target.src || e.target.href)) {
+      reportClient({action: 'resource.load', message: 'Ресурс не загрузился: ' + (e.target.src || e.target.href),
+                    type: 'ResourceError'});
+      return;
+    }
+    reportClient({action: 'window.onerror', message: (e && e.message) || 'Ошибка сценария',
+                  stack: (e && e.error && e.error.stack) || ((e && e.filename) + ':' + (e && e.lineno)),
+                  type: (e && e.error && e.error.name) || 'Error'});
+  }, true);
+  window.addEventListener('unhandledrejection', e => {
+    const r = (e && e.reason) || {};
+    reportClient({action: 'unhandledrejection', message: r.message || String(r),
+                  stack: r.stack || '', code: r.code || '', type: r.name || 'PromiseRejection'});
+  });
 
   const can = right => S.rights.has('*') || S.rights.has(right);
 
@@ -315,6 +375,9 @@ const App = (() => {
   }
   function paintStatus() {
     if (!S.system) return;
+    // версия в шапке — с сервера, а не зашитая в разметку (было «v0.1» при 1.3.x)
+    const ver = $('app-ver');
+    if (ver) ver.textContent = 'v' + S.system.version + ' · ' + (S.system.profile || '');
     $('st-method').textContent = 'методика: ' + S.system.methodology_version;
     $('st-sync').textContent = 'синхронизация: ' + (S.lastSync ? S.lastSync.toLocaleTimeString('ru-RU') : '—');
     $('st-jobs').textContent = 'задания: ' + (S.jobsRunning ? S.jobsRunning + ' выполняется' : 'нет активных');
@@ -405,6 +468,8 @@ const App = (() => {
     {group: 'Администрирование', items: [
       {m: 'M30', t: 'Мониторинг', ico: '📡', route: 'monitor'},
       {m: 'M30', t: 'Журнал работы', ico: '🧭', route: 'logs'},
+      {m: 'M33', t: 'Журнал действий и диагностика', ico: '🧾', route: 'journal'},
+      {m: 'M30', t: 'Эксплуатация и SLO', ico: '🛟', route: 'ops'},
       {m: 'M31', t: 'Настройки', ico: '⚙️', route: 'settings'},
       {m: 'M32', t: 'Контроль качества', ico: '✅', route: 'quality'},
       {m: 'M32', t: 'Реестр методик', ico: '📐', route: 'methodologies'},
@@ -458,7 +523,12 @@ const App = (() => {
     if (screen.right && !can(screen.right)) { body.innerHTML = denied(screen.right); return; }
     loading(body);
     try { await screen.render(body, params); }
-    catch (e) { fail(body, e, {stage: screen.ui}); }
+    catch (e) {
+      fail(body, e, {stage: screen.ui});
+      reportClient({action: 'render.' + route, message: (e && e.message) || String(e),
+                    stack: e && e.stack, code: e && e.code, type: (e && e.name) || 'RenderError',
+                    detail: {screen: screen.ui, params: params}});
+    }
     $('workspace').scrollTop = 0;
   }
 
@@ -473,10 +543,13 @@ const App = (() => {
     $('login').hidden = true; $('app').hidden = false;
     $('user').textContent = (S.user.display_name || S.user.login) + ' · ' + S.user.role;
     await refreshSystem();
-    await loadResearches(true).catch(() => {});
+    blog('Состояние системы получено', 'ok', S.system ? 'версия ' + S.system.version : '');
+    await loadResearches(true).catch(e => blog('Список исследований не загружен', 'warn', (e && e.message) || ''));
     connectSSE(); paintStatus(); paintConn();
     if (!location.hash) location.hash = '#/dashboard';
     await render();
+    blog('Интерфейс готов', 'ok', 'экран: ' + (S.route || 'dashboard'));
+    const b = boot(); if (b) b.hide();
     setInterval(refreshSystem, 60000);
   }
   function logout(clear = true) {
@@ -490,41 +563,92 @@ const App = (() => {
   }
 
   // ---------------------------------------------------------------- инициализация
+  const boot = () => window.__isheikaBoot || null;
+  const blog = (step, status, detail) => { const b = boot(); if (b) b.log(step, status, detail); };
+
+  // Отсутствие элемента не должно ронять инициализацию: раньше любой null
+  // в цепочке addEventListener приводил к пустому экрану без диагностики.
+  function on(id, evt, fn) {
+    const el = $(id);
+    if (!el) { blog('Элемент интерфейса не найден: #' + id, 'fail', 'обработчик ' + evt + ' не установлен'); return null; }
+    el.addEventListener(evt, fn);
+    return el;
+  }
+
+  async function bootLogModal() {
+    const b = boot();
+    let srv = null;
+    try { srv = await get('/api/v1/boot-log'); } catch (e) { srv = {error: e.message || String(e)}; }
+    const rows = (srv && srv.steps || []).map(s =>
+      `<tr><td>${esc(s.at)}</td><td>${s.status === 'ok' ? tag('ok', 'ok') : tag(s.status, 'err')}</td><td>${esc(s.step)}</td><td class="tiny">${esc(s.detail || '')}</td></tr>`).join('');
+    const checks = (srv && srv.checks || []).map(c =>
+      `<tr><td>${c.ok ? tag('исправно', 'ok') : tag('ОТКАЗ', 'err')}</td><td>${esc(c.check)}</td><td class="tiny">${esc(c.detail || '')}</td></tr>`).join('');
+    const assets = (srv && srv.assets || []).map(a =>
+      `<tr><td>${a.ok ? tag('ok', 'ok') : tag('нет', 'err')}</td><td>${esc(a.asset)}</td><td class="num">${a.bytes}</td><td class="tiny">${esc(a.ctype || '')}</td></tr>`).join('');
+    modal('Журнал загрузки и самопроверка', `
+      ${alertBox(srv && srv.ok ? 'ok' : 'error', srv && srv.ok ? 'Запуск исправен: все проверки пройдены.' : 'Есть отказы — см. строки ниже. Журнал можно скачать и приложить к обращению.')}
+      ${kv({'Запуск': esc(srv && srv.boot_id || '—'), 'Версия': esc(srv && srv.app_version || '—'),
+            'Профиль': esc(srv && srv.profile || '—'), 'Python': esc(srv && srv.python || '—'),
+            'Платформа': esc(srv && srv.platform || '—'), 'Каталог данных': esc(srv && srv.data_dir || '—')})}
+      <h3>Шаги запуска сервера</h3><table class="tbl">${rows || '<tr><td>нет данных</td></tr>'}</table>
+      <h3>Самопроверка</h3><table class="tbl">${checks || '<tr><td>нет данных</td></tr>'}</table>
+      <h3>Ресурсы интерфейса</h3><table class="tbl">${assets || '<tr><td>нет данных</td></tr>'}</table>
+      <h3>Шаги браузера</h3><pre class="boot-log">${esc(b ? b.text() : 'журнал браузера недоступен')}</pre>
+      <div class="row">
+        <a class="btn sm" href="${fileURL('/api/v1/boot-log/export', {fmt: 'txt'})}">Скачать журнал сервера</a>
+        <button class="btn sm" id="boot-dl-client">Скачать журнал браузера</button>
+      </div>`);
+    const dl = $('boot-dl-client');
+    if (dl && b) dl.addEventListener('click', () => b.download());
+  }
+
   function init() {
     setTheme(S.theme);
-    $('login-form').addEventListener('submit', async ev => {
+    blog('Инициализация интерфейса', 'ok', 'App.init');
+    on('login-form', 'submit', async ev => {
       ev.preventDefault();
       const f = ev.target, box = $('login-error');
       box.hidden = true;
       try { await login(f.login.value.trim(), f.password.value); }
       catch (e) { box.hidden = false; box.innerHTML = esc(e.message || 'Ошибка входа') + ' <span class="tiny">(' + esc(e.code || '') + ')</span>'; }
     });
-    $('theme-btn').addEventListener('click', () => { setTheme(S.theme === 'light' ? 'dark' : 'light'); if (S.user) render(); });
-    $('logout-btn').addEventListener('click', () => logout());
-    $('menu-toggle').addEventListener('click', () => $('app').classList.toggle('nav-collapsed'));
-    $('context-toggle').addEventListener('click', () => $('app').classList.toggle('ctx-collapsed'));
-    $('modal-close').addEventListener('click', closeModal);
-    $('modal').addEventListener('click', ev => { if (ev.target.id === 'modal') closeModal(); });
+    on('theme-btn', 'click', () => { setTheme(S.theme === 'light' ? 'dark' : 'light'); if (S.user) render(); });
+    on('logout-btn', 'click', () => logout());
+    on('menu-toggle', 'click', () => $('app').classList.toggle('nav-collapsed'));
+    on('context-toggle', 'click', () => $('app').classList.toggle('ctx-collapsed'));
+    on('modal-close', 'click', closeModal);
+    on('modal', 'click', ev => { if (ev.target.id === 'modal') closeModal(); });
     document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeModal(); });
-    $('notif-btn').addEventListener('click', () => {
+    on('notif-btn', 'click', () => {
       S.unread = 0; paintNotif();
       modal('Уведомления', S.notifications.length ? S.notifications.slice(0, 60).map(e =>
         `<div class="evidence-item"><b>${esc(e.event_type)}</b> <span class="tiny muted">${dt(e.created_at)}</span>
          <div class="tiny">${esc(short(JSON.stringify(e.payload || {}), 300))}</div></div>`).join('') : empty('Уведомлений нет', '🔔'));
     });
     const gs = () => { const q = $('global-search').value.trim(); if (q) go('new', {q}); };
-    $('global-search-btn').addEventListener('click', gs);
-    $('global-search').addEventListener('keydown', ev => { if (ev.key === 'Enter') gs(); });
+    on('global-search-btn', 'click', gs);
+    on('global-search', 'keydown', ev => { if (ev.key === 'Enter') gs(); });
     window.addEventListener('hashchange', render);
     window.addEventListener('online', () => { S.online = true; paintConn(); });
     window.addEventListener('offline', () => { S.online = false; paintConn(); toast('Сеть недоступна: работа в режиме offline', 'warn'); });
+    on('boot-btn', 'click', bootLogModal);
     (async () => {
-      if (!S.token) { $('login').hidden = false; return; }
       try {
+        if (!S.token) {
+          $('login').hidden = false;
+          blog('Форма входа показана', 'ok', 'сохранённого токена нет');
+          const b = boot(); if (b) b.hide();
+          return;
+        }
         const me = await get('/api/v1/auth/me');
         S.user = me.user; S.rights = new Set(me.rights || []);
+        blog('Сессия восстановлена', 'ok', S.user.login + ' · ' + S.user.role);
         await afterLogin();
-      } catch (e) { $('login').hidden = false; }
+      } catch (e) {
+        $('login').hidden = false;
+        blog('Восстановление сессии не удалось', 'warn', (e && e.message) || String(e));
+        const b = boot(); if (b) b.hide();
+      }
     })();
   }
 
@@ -533,7 +657,7 @@ const App = (() => {
     tag, statusTag, kpi, card, alert: alertBox, kv, spinner, empty, denied, loading, fail, errorBlock,
     table, exportCSV, download, fileURL, toast, modal, closeModal, ctx, ctxObject,
     loadResearches, setResearch, researchBar, wireResearchBar, needResearch, runResearch,
-    go, render, refreshSystem, MENU, STATUS_RU, init, setTheme, logout,
+    go, render, refreshSystem, MENU, STATUS_RU, init, setTheme, logout, bootLogModal, reportClient,
   };
 })();
 

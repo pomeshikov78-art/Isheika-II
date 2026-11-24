@@ -1,18 +1,18 @@
 {
-  "artifact": "/tmp/arena/tenants/71ebd7cc-b365-41c5-863c-79f587b1df1f/sessions/5e45f2ec-352e-5a19-b6a2-af12bea17743/workspace/isheika/release/ISHEIKA-NTR-AI.exe",
-  "app_version": "1.3.0",
+  "artifact": "/tmp/arena/tenants/71ebd7cc-b365-41c5-863c-79f587b1df1f/sessions/f005aeb6-2bf1-5ac0-9c2e-bbd5597fcc55/workspace/repo/release/ISHEIKA-NTR-AI.exe",
+  "app_version": "1.4.0",
   "python": "3.11.9",
-  "built_at": "2026-11-24T11:31:27+00:00",
-  "size_bytes": 9996528,
-  "sha256": "86f04ee290a5b5247b471fb32bcb1ef754622c137c604799b0f72a62f38841f3",
+  "built_at": "2026-11-24T16:56:57+00:00",
+  "size_bytes": 10033318,
+  "sha256": "0ef7d9016e116f488d973ff08f135d13bf5fb282aae8f5cda5f523376f9e6494",
   "sfx": {
-    "file": "/tmp/arena/tenants/71ebd7cc-b365-41c5-863c-79f587b1df1f/sessions/5e45f2ec-352e-5a19-b6a2-af12bea17743/workspace/isheika/tools/vendor/7zSD.sfx",
+    "file": "/tmp/arena/tenants/71ebd7cc-b365-41c5-863c-79f587b1df1f/sessions/f005aeb6-2bf1-5ac0-9c2e-bbd5597fcc55/workspace/repo/tools/vendor/7zSD.sfx",
     "sha256": "18b4c189f195d55fe1e6c08d6a186d31c89d6c3c55afe122a55230078f7ea294",
     "size_bytes": 128000
   },
   "payload": {
-    "files_in_app": 108,
-    "archive_bytes": 9868150,
+    "files_in_app": 112,
+    "archive_bytes": 9904940,
     "config_bytes": 378,
     "top_level": [
       "VERSION.txt",
@@ -26,9 +26,9 @@
   "data_dir": "%LOCALAPPDATA%\\IsheikaNTR-AI",
   "sevenzip": "/usr/bin/7z",
   "portable_zip": {
-    "file": "/tmp/arena/tenants/71ebd7cc-b365-41c5-863c-79f587b1df1f/sessions/5e45f2ec-352e-5a19-b6a2-af12bea17743/workspace/isheika/release/ISHEIKA-NTR-AI-portable.zip",
-    "size_bytes": 12196215,
-    "sha256": "b613c9535e16f73e755d1a45da068a65c26efe2f36b11f82a0e31f60ff07bbe4",
+    "file": "/tmp/arena/tenants/71ebd7cc-b365-41c5-863c-79f587b1df1f/sessions/f005aeb6-2bf1-5ac0-9c2e-bbd5597fcc55/workspace/repo/release/ISHEIKA-NTR-AI-portable.zip",
+    "size_bytes": 12258097,
+    "sha256": "b7066ca51e4d834c6d739860b9b96d8d71192c40a10fa389893a2554d9736598",
     "note": "распаковать и запустить isheika.cmd — тот же образ без SFX"
   },
   "structure": {
@@ -44,52 +44,248 @@
   },
   "wine_check": {
     "performed": true,
-    "ok": false,
-    "error": "RuntimeError: can't start new thread",
-    "environment_limited": true,
-    "reason": "Повторная проверка под wine не выполнена: в песочнице сборки исчерпан лимит процессов (791 зомби-процесс wine), создание потока/процесса недоступно."
+    "python": [
+      "3.11.9",
+      "3.45.1"
+    ],
+    "port": 8011,
+    "api": 200,
+    "ui": null,
+    "checks": [
+      {
+        "path": "/api/v1/researches",
+        "status": 200,
+        "bytes": 13
+      },
+      {
+        "path": "/api/v1/methodologies",
+        "status": 200,
+        "bytes": 18555
+      },
+      {
+        "path": "/api/v1/sources",
+        "status": 200,
+        "bytes": 124120
+      },
+      {
+        "path": "/",
+        "status": 200,
+        "bytes": 16245
+      }
+    ],
+    "assets": [
+      {
+        "asset": "index.html",
+        "http": 200,
+        "bytes": 16245,
+        "expected_bytes": 16245,
+        "ctype": "text/html; charset=utf-8",
+        "ok": true
+      },
+      {
+        "asset": "styles.css",
+        "http": 200,
+        "bytes": 14790,
+        "expected_bytes": 14790,
+        "ctype": "text/css; charset=utf-8",
+        "ok": true
+      },
+      {
+        "asset": "charts.js",
+        "http": 200,
+        "bytes": 23566,
+        "expected_bytes": 23566,
+        "ctype": "application/javascript; charset=utf-8",
+        "ok": true
+      },
+      {
+        "asset": "screens_core.js",
+        "http": 200,
+        "bytes": 94098,
+        "expected_bytes": 94098,
+        "ctype": "application/javascript; charset=utf-8",
+        "ok": true
+      },
+      {
+        "asset": "screens_registry.js",
+        "http": 200,
+        "bytes": 72521,
+        "expected_bytes": 72521,
+        "ctype": "application/javascript; charset=utf-8",
+        "ok": true
+      },
+      {
+        "asset": "screens_v11.js",
+        "http": 200,
+        "bytes": 32012,
+        "expected_bytes": 32012,
+        "ctype": "application/javascript; charset=utf-8",
+        "ok": true
+      },
+      {
+        "asset": "screens_ops.js",
+        "http": 200,
+        "bytes": 14532,
+        "expected_bytes": 14532,
+        "ctype": "application/javascript; charset=utf-8",
+        "ok": true
+      },
+      {
+        "asset": "screens_journal.js",
+        "http": 200,
+        "bytes": 21859,
+        "expected_bytes": 21859,
+        "ctype": "application/javascript; charset=utf-8",
+        "ok": true
+      },
+      {
+        "asset": "app.js",
+        "http": 200,
+        "bytes": 44772,
+        "expected_bytes": 44772,
+        "ctype": "application/javascript; charset=utf-8",
+        "ok": true
+      }
+    ],
+    "log_tail": "ИЩЕЙКА НТР AI · профиль DEV · http://127.0.0.1:8011/\nЗагрузка boot-0df2e19f-771f-4006-ac48-df928ccdd7e6: исправно\n  ✓ Конфигурация — профиль DEV, сеть выкл, платный ИИ запрещён\n  ✓ Каталоги данных\n  ✓ База данных и миграции — 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal\n  ✓ Реестры источников и методик — источников 806, стран 35, коннекторов 24\n  ✓ Обработчики этапов — workflow.pipeline импортирован\n  ✓ Ресурсы интерфейса — проверено 9\n  ✓ Маршруты API — 97 маршрутов\n  ✓ Привязка порта — 127.0.0.1:8011\n  ✓ Планировщик самопроверок — шаг 60 с\n  ✓ Каталог данных доступен на запись — /tmp/isheika-exe-data\n  ✓ База данных целостна — quick_check=ok; миграции: 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal\n  ✓ Реестры загружены — registry_sources=806; dict_countries=35; registry_connectors=24; ai_providers=18\n  ✓ Ресурсы интерфейса на месте — проверено 9\n  ✓ Маршруты API зарегистрированы — 97 маршрутов\n  ✓ Подсистемы отвечают — api=ok (0.004 мс); database=ok (7.687 мс); storage=ok (2.629 мс)\nЖурнал загрузки: /tmp/isheika-exe-data\\boot-log.txt\nДиагностика в браузере: http://127.0.0.1:8011/api/v1/boot-log\n",
+    "ok": true
   },
   "wine_launch": {
     "performed": true,
-    "ok": false,
-    "error": "BlockingIOError: [Errno 11] Resource temporarily unavailable",
-    "environment_limited": true,
-    "reason": "Повторная проверка под wine не выполнена: в песочнице сборки исчерпан лимит процессов (791 зомби-процесс wine), создание потока/процесса недоступно."
+    "command": "cmd.exe /c isheika.cmd 8021",
+    "port": 8021,
+    "http": 200,
+    "ui": 200,
+    "checks": [
+      {
+        "path": "/api/v1/researches",
+        "status": 200
+      },
+      {
+        "path": "/api/v1/methodologies",
+        "status": 200
+      },
+      {
+        "path": "/api/v1/document-graph",
+        "status": 200
+      }
+    ],
+    "ui_bytes": 16245,
+    "log_tail": " · http://127.0.0.1:8021/\nЗагрузка boot-cdb3a7a1-9644-45ef-9cbd-54ab26098f6c: исправно\n  ✓ Конфигурация — профиль DEV, сеть вкл, платный ИИ запрещён\n  ✓ Каталоги данных\n  ✓ База данных и миграции — 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal\n  ✓ Реестры источников и методик — источников 806, стран 35, коннекторов 24\n  ✓ Обработчики этапов — workflow.pipeline импортирован\n  ✓ Ресурсы интерфейса — проверено 9\n  ✓ Маршруты API — 97 маршрутов\n  ✓ Привязка порта — 127.0.0.1:8021\n  ✓ Планировщик самопроверок — шаг 60 с\n  ✓ Каталог данных доступен на запись — C:\\users\\root\\AppData\\Local\\IsheikaNTR-AI\n  ✓ База данных целостна — quick_check=ok; миграции: 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal\n  ✓ Реестры загружены — registry_sources=806; dict_countries=35; registry_connectors=24; ai_providers=18\n  ✓ Ресурсы интерфейса на месте — проверено 9\n  ✓ Маршруты API зарегистрированы — 97 маршрутов\n  ✓ Подсистемы отвечают — api=ok (0.004 мс); database=ok (13.984 мс); storage=ok (2.444 мс)\nЖурнал загрузки: C:\\users\\root\\AppData\\Local\\IsheikaNTR-AI\\boot-log.txt\nДиагностика в браузере: http://127.0.0.1:8021/api/v1/boot-log\n",
+    "ok": true
   },
   "wine_tests": {
     "performed": true,
-    "ok": false,
-    "error": "BlockingIOError: [Errno 11] Resource temporarily unavailable",
-    "environment_limited": true,
-    "reason": "Повторная проверка под wine не выполнена: в песочнице сборки исчерпан лимит процессов (791 зомби-процесс wine), создание потока/процесса недоступно."
-  },
-  "environment_note": "Повторная проверка под wine не выполнена: в песочнице сборки исчерпан лимит процессов (791 зомби-процесс wine), создание потока/процесса недоступно.",
-  "prior_windows_verification": {
-    "artifact_sha256": "5129d5f38e1f759c",
-    "note": "Тот же код статики и журнала загрузки проверен в Windows-образе: ресурсов 8/8 (размер и тип каждого файла совпали с исходными), 143/143 тестов внутри образа, цепочка запуска cmd.exe /c isheika.cmd → HTTP 200 / интерфейс 200.",
-    "assets_ok": 8,
-    "assets_total": 8,
-    "tests": "143/143",
-    "launch_ok": true
+    "returncode": 0,
+    "tail": [
+      "----------------------------------------------------------------------",
+      "Ran 185 tests in 16.337s",
+      "",
+      "OK"
+    ],
+    "ok": true
   },
   "linux_verification": {
-    "structure": {
-      "mz": true,
-      "pe": true,
-      "machine": "0x14c",
-      "config_offset": 128000,
-      "config_present": true,
-      "launch": "ExecuteFile",
-      "launch_ok": true,
-      "archive_offset": 128378,
-      "archive_signature_ok": true
-    },
-    "assets_in_payload_identical": true,
-    "served_assets_ok": "8/8 (размер и Content-Type совпадают с исходными)",
+    "performed": true,
+    "interpreter": "/usr/bin/python3",
+    "python": "3.11.2",
+    "port": 8031,
+    "http": 200,
+    "ui": 200,
+    "assets": [
+      {
+        "asset": "index.html",
+        "bytes": 16245,
+        "ctype": "text/html; charset=utf-8",
+        "identical_to_source": true,
+        "ctype_ok": true,
+        "status": 200
+      },
+      {
+        "asset": "styles.css",
+        "bytes": 14790,
+        "ctype": "text/css; charset=utf-8",
+        "identical_to_source": true,
+        "ctype_ok": true,
+        "status": 200
+      },
+      {
+        "asset": "charts.js",
+        "bytes": 23566,
+        "ctype": "application/javascript; charset=utf-8",
+        "identical_to_source": true,
+        "ctype_ok": true,
+        "status": 200
+      },
+      {
+        "asset": "screens_core.js",
+        "bytes": 94098,
+        "ctype": "application/javascript; charset=utf-8",
+        "identical_to_source": true,
+        "ctype_ok": true,
+        "status": 200
+      },
+      {
+        "asset": "screens_registry.js",
+        "bytes": 72521,
+        "ctype": "application/javascript; charset=utf-8",
+        "identical_to_source": true,
+        "ctype_ok": true,
+        "status": 200
+      },
+      {
+        "asset": "screens_v11.js",
+        "bytes": 32012,
+        "ctype": "application/javascript; charset=utf-8",
+        "identical_to_source": true,
+        "ctype_ok": true,
+        "status": 200
+      },
+      {
+        "asset": "screens_ops.js",
+        "bytes": 14532,
+        "ctype": "application/javascript; charset=utf-8",
+        "identical_to_source": true,
+        "ctype_ok": true,
+        "status": 200
+      },
+      {
+        "asset": "screens_journal.js",
+        "bytes": 21859,
+        "ctype": "application/javascript; charset=utf-8",
+        "identical_to_source": true,
+        "ctype_ok": true,
+        "status": 200
+      },
+      {
+        "asset": "app.js",
+        "bytes": 44772,
+        "ctype": "application/javascript; charset=utf-8",
+        "identical_to_source": true,
+        "ctype_ok": true,
+        "status": 200
+      }
+    ],
+    "launch_chain": "не проверялась (нужен wine)",
+    "ui_bytes": 16245,
+    "ui_ctype": "text/html; charset=utf-8",
+    "assets_ok": 9,
+    "assets_total": 9,
     "boot_log_ok": true,
+    "boot_checks": 6,
+    "app_version": "1.4.0",
     "missing_asset_status": 404,
-    "unit_tests": "144/144",
-    "api_check": "94/94",
-    "ui_check": "70/70"
+    "log_tail": " AI · профиль DEV · http://127.0.0.1:8031/\nЗагрузка boot-bccd1ac4-db64-420c-ac11-944d10e10bdb: исправно\n  ✓ Конфигурация — профиль DEV, сеть выкл, платный ИИ запрещён\n  ✓ Каталоги данных\n  ✓ База данных и миграции — 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal\n  ✓ Реестры источников и методик — источников 806, стран 35, коннекторов 24\n  ✓ Обработчики этапов — workflow.pipeline импортирован\n  ✓ Ресурсы интерфейса — проверено 9\n  ✓ Маршруты API — 97 маршрутов\n  ✓ Привязка порта — 127.0.0.1:8031\n  ✓ Планировщик самопроверок — шаг 60 с\n  ✓ Каталог данных доступен на запись — /tmp/isheika-linux-data-dx_l5qsj\n  ✓ База данных целостна — quick_check=ok; миграции: 0001_init, 0002_tz_v11, 0003_observability, 0004_ops, 0005_boot_log, 0006_journal\n  ✓ Реестры загружены — registry_sources=806; dict_countries=35; registry_connectors=24; ai_providers=18\n  ✓ Ресурсы интерфейса на месте — проверено 9\n  ✓ Маршруты API зарегистрированы — 97 маршрутов\n  ✓ Подсистемы отвечают — api=ok (0.003 мс); database=ok (18.429 мс); storage=ok (0.249 мс)\nЖурнал загрузки: /tmp/isheika-linux-data-dx_l5qsj/boot-log.txt\nДиагностика в браузере: http://127.0.0.1:8031/api/v1/boot-log\n",
+    "unit_tests": {
+      "returncode": 0,
+      "tail": [
+        "----------------------------------------------------------------------",
+        "Ran 185 tests in 5.488s",
+        "",
+        "OK"
+      ],
+      "ok": true
+    },
+    "ok": true
   }
 }

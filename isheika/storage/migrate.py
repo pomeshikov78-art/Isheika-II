@@ -303,7 +303,81 @@ def migrate_0003_observability(conn) -> dict:
     return {"columns_added": added}
 
 
-MIGRATIONS = [("0002_tz_v11", migrate_0002), ("0003_observability", migrate_0003_observability)]
+def migrate_0004_ops(conn) -> dict:
+    """ROADMAP P6 (ред. 1.3): самопроверки доступности, алерты, реестр копий.
+
+    Таблицы создаются идемпотентно; предметные данные не изменяются.
+    """
+    created = []
+    ddl = {
+        "service_probes": """CREATE TABLE IF NOT EXISTS service_probes (
+            id TEXT PRIMARY KEY, at TEXT NOT NULL, component TEXT NOT NULL,
+            ok INTEGER NOT NULL, latency_ms REAL, detail TEXT)""",
+        "ops_alerts": """CREATE TABLE IF NOT EXISTS ops_alerts (
+            id TEXT PRIMARY KEY, rule_code TEXT NOT NULL, severity TEXT NOT NULL,
+            state TEXT NOT NULL DEFAULT 'open', message TEXT,
+            context TEXT NOT NULL DEFAULT '{}', opened_at TEXT NOT NULL,
+            closed_at TEXT, ack_by TEXT, ack_at TEXT)""",
+        "ops_backups": """CREATE TABLE IF NOT EXISTS ops_backups (
+            id TEXT PRIMARY KEY, created_at TEXT NOT NULL, path TEXT NOT NULL,
+            file_name TEXT, size_bytes INTEGER, sha256 TEXT, kind TEXT,
+            app_version TEXT, items TEXT NOT NULL DEFAULT '{}',
+            verified_at TEXT, verify_result TEXT, created_by TEXT)""",
+    }
+    have = _tables(conn)
+    for name, sql in ddl.items():
+        if name not in have:
+            created.append(name)
+        conn.execute(sql)
+    for sql in ("CREATE INDEX IF NOT EXISTS ix_probes_at ON service_probes(at)",
+                "CREATE INDEX IF NOT EXISTS ix_probes_component ON service_probes(component, at)",
+                "CREATE INDEX IF NOT EXISTS ix_alerts_state ON ops_alerts(state, rule_code)",
+                "CREATE INDEX IF NOT EXISTS ix_backups_created ON ops_backups(created_at DESC)"):
+        conn.execute(sql)
+    return {"tables_created": created}
+
+
+def migrate_0005_boot_log(conn) -> dict:
+    """Журнал загрузки (замечание пользователя: диагностика вместо «белого экрана»)."""
+    created = "ops_boot_log" not in _tables(conn)
+    conn.execute("""CREATE TABLE IF NOT EXISTS ops_boot_log (
+        id TEXT PRIMARY KEY, boot_id TEXT NOT NULL, at TEXT NOT NULL,
+        step TEXT NOT NULL, status TEXT NOT NULL, detail TEXT, duration_ms REAL)""")
+    conn.execute("CREATE INDEX IF NOT EXISTS ix_boot_log_boot ON ops_boot_log(boot_id, at)")
+    return {"tables_created": ["ops_boot_log"] if created else []}
+
+
+def migrate_0006_journal(conn) -> dict:
+    """Журнал действий времени работы (ред. 1.4.0, задача пользователя).
+
+    Предметные данные не изменяются: добавляется только таблица журнала и индексы.
+    Существующие audit_log / workflow_events / audit_api_calls остаются как есть —
+    журнал их не подменяет, а связывает через request_id / correlation_id.
+    """
+    created = "ops_journal" not in _tables(conn)
+    conn.execute("""CREATE TABLE IF NOT EXISTS ops_journal (
+        id TEXT PRIMARY KEY, at TEXT NOT NULL,
+        level TEXT NOT NULL CHECK (level IN ('debug','info','warn','error','critical')), kind TEXT NOT NULL,
+        action TEXT NOT NULL, message TEXT, actor TEXT, role TEXT,
+        source TEXT NOT NULL DEFAULT 'server', outcome TEXT, http_status INTEGER,
+        duration_ms REAL, research_id TEXT, entity_kind TEXT, entity_id TEXT, job_id TEXT,
+        request_id TEXT, correlation_id TEXT, boot_id TEXT, error_code TEXT, error_type TEXT,
+        stack TEXT, fingerprint TEXT, detail TEXT NOT NULL DEFAULT '{}',
+        client TEXT NOT NULL DEFAULT '{}')""")
+    for sql in ("CREATE INDEX IF NOT EXISTS ix_journal_at ON ops_journal(at DESC)",
+                "CREATE INDEX IF NOT EXISTS ix_journal_level ON ops_journal(level, at DESC)",
+                "CREATE INDEX IF NOT EXISTS ix_journal_kind ON ops_journal(kind, at DESC)",
+                "CREATE INDEX IF NOT EXISTS ix_journal_research ON ops_journal(research_id, at DESC)",
+                "CREATE INDEX IF NOT EXISTS ix_journal_correlation ON ops_journal(correlation_id)",
+                "CREATE INDEX IF NOT EXISTS ix_journal_fingerprint ON ops_journal(fingerprint, at DESC)",
+                "CREATE INDEX IF NOT EXISTS ix_journal_actor ON ops_journal(actor, at DESC)"):
+        conn.execute(sql)
+    return {"tables_created": ["ops_journal"] if created else []}
+
+
+MIGRATIONS = [("0002_tz_v11", migrate_0002), ("0003_observability", migrate_0003_observability),
+              ("0004_ops", migrate_0004_ops), ("0005_boot_log", migrate_0005_boot_log),
+              ("0006_journal", migrate_0006_journal)]
 
 
 def apply_all(conn) -> list[dict]:

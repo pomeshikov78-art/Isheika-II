@@ -5,9 +5,191 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ИЩЕЙКА НТР AI — открытая научно-техническая разведка</title>
 <link rel="stylesheet" href="styles.css">
+<script>
+/* Журнал загрузки. Ставится ПЕРВЫМ и не зависит от app.js: любая ошибка
+   (сценарий не загрузился, упал при разборе, сервер не ответил) попадает
+   в журнал на экране вместо «белого экрана». */
+(function () {
+  var B = {steps: [], failed: false, t0: Date.now(), server: null};
+  window.__isheikaBoot = B;
+  function ms() { return (Date.now() - B.t0) + ' мс'; }
+  function paint() {
+    var box = document.getElementById('boot-log');
+    if (!box) return;
+    var html = B.steps.map(function (s) {
+      var cls = s.status === 'ok' ? 'ok' : s.status === 'fail' ? 'fail' : s.status === 'warn' ? 'warn' : 'muted';
+      var mark = s.status === 'ok' ? 'OK  ' : s.status === 'fail' ? 'FAIL' : s.status === 'warn' ? 'WARN' : '····';
+      return '<span class="' + cls + '">' + mark + ' ' + s.at + '  ' + s.step +
+        (s.detail ? ' — ' + String(s.detail).replace(/[&<>]/g, '') : '') + '</span>';
+    }).join('\n');
+    if (B.server) {
+      html += '\n\n<span class="muted">— журнал сервера (' + B.server.boot_id + ', версия ' +
+        B.server.app_version + ') —</span>\n';
+      html += (B.server.steps || []).map(function (s) {
+        return '<span class="' + (s.status === 'ok' ? 'ok' : 'fail') + '">' +
+          (s.status === 'ok' ? 'OK  ' : 'FAIL') + ' ' + s.step +
+          (s.detail ? ' — ' + String(s.detail).replace(/[&<>]/g, '') : '') + '</span>';
+      }).join('\n');
+      html += '\n' + (B.server.checks || []).map(function (c) {
+        return '<span class="' + (c.ok ? 'ok' : 'fail') + '">' + (c.ok ? 'OK  ' : 'FAIL') + ' ' +
+          c.check + ' — ' + String(c.detail).replace(/[&<>]/g, '') + '</span>';
+      }).join('\n');
+    }
+    box.innerHTML = html;
+    box.scrollTop = box.scrollHeight;
+    var st = document.getElementById('boot-status');
+    if (st) st.textContent = B.failed
+      ? (B.ready() ? 'Интерфейс работает, но диагностика отметила отказ — подробности ниже'
+                   : 'ОБНАРУЖЕН ОТКАЗ — подробности ниже')
+      : 'Загрузка…';
+    var cont = document.getElementById('boot-continue');
+    if (cont) cont.hidden = !B.ready();
+  }
+  /* Отказ загрузки уходит в журнал действий на сервере (ред. 1.4.0): иначе
+     свидетельство о «белом экране» существует только во вкладке пользователя. */
+  var reported = 0;
+  function report(step, detail) {
+    if (reported >= 10) return;
+    reported += 1;
+    try {
+      fetch('api/v1/journal/client', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, keepalive: true,
+        body: JSON.stringify({level: 'error', kind: 'ui', action: 'boot.' + step,
+                              message: String(detail || step).slice(0, 900),
+                              route: location.hash || '', url: location.pathname,
+                              error_type: 'BootFailure', boot_id: (B.server && B.server.boot_id) || ''})
+      }).catch(function () {});
+    } catch (e) { /* журнал недоступен — экран диагностики уже показывает причину */ }
+  }
+  B.log = function (step, status, detail) {
+    B.steps.push({step: step, status: status || 'info', detail: detail || '', at: ms()});
+    if (status === 'fail') { B.failed = true; B.show(); report(step, detail); }
+    paint();
+  };
+  B.show = function () {
+    if (B.dismissed) { paint(); return; }      // пользователь закрыл журнал — не перехватываем экран снова
+    var w = document.getElementById('boot');
+    if (w) w.hidden = false;
+    var a = document.getElementById('boot-actions');
+    if (a) a.hidden = false;
+    paint();
+  };
+  B.hide = function () { var w = document.getElementById('boot'); if (w && !B.failed) w.hidden = true; };
+  /* Закрыть журнал и продолжить работу: отказ диагностики не должен запирать
+     работоспособный интерфейс. Журнал остаётся доступен по кнопке 🧾. */
+  B.dismiss = function () {
+    var w = document.getElementById('boot');
+    if (w) w.hidden = true;
+    B.dismissed = true;
+    B.log('Экран диагностики закрыт пользователем', 'info', 'журнал доступен по кнопке 🧾 в верхней панели');
+  };
+  /* Модуль может быть объявлен как `const` — это лексическая привязка глобальной
+     области, а НЕ свойство window (window.Charts === undefined при рабочем Charts).
+     Диагностика обязана видеть оба варианта, иначе она сама создаёт ложный отказ.
+     typeof обёрнут в try: до выполнения сценария привязка находится в TDZ. */
+  B.mod = function (name, lexical) {
+    if (window[name]) return window[name];
+    try { return lexical() || null; } catch (e) { return null; }
+  };
+  B.ready = function () {
+    var app = B.mod('App', function () { return typeof App !== 'undefined' ? App : null; });
+    return !!(app && app.S);
+  };
+  B.fetchServer = function () {
+    return fetch('api/v1/boot-log', {headers: {'Accept': 'application/json'}})
+      .then(function (r) { return r.json(); })
+      .then(function (d) { B.server = d; B.log('Журнал сервера получен', d.ok ? 'ok' : 'fail',
+        'проверок: ' + (d.checks || []).length); paint(); return d; })
+      .catch(function (e) { B.log('Журнал сервера недоступен', 'fail', String(e)); return null; });
+  };
+  B.text = function () {
+    var lines = ['ИЩЕЙКА НТР AI — журнал загрузки браузера', 'Адрес: ' + location.href,
+      'Браузер: ' + navigator.userAgent, ''];
+    B.steps.forEach(function (s) { lines.push(s.status.toUpperCase() + ' ' + s.at + ' ' + s.step + (s.detail ? ' — ' + s.detail : '')); });
+    if (B.server) {
+      lines.push('', '— сервер ' + B.server.boot_id + ' версия ' + B.server.app_version + ' —');
+      (B.server.steps || []).forEach(function (s) { lines.push(s.status.toUpperCase() + ' ' + s.step + (s.detail ? ' — ' + s.detail : '')); });
+      (B.server.checks || []).forEach(function (c) { lines.push((c.ok ? 'OK ' : 'FAIL ') + c.check + ' — ' + c.detail); });
+      (B.server.assets || []).forEach(function (a) { lines.push((a.ok ? 'OK ' : 'FAIL ') + ' ресурс ' + a.asset + ' ' + a.bytes + ' Б ' + a.ctype); });
+    }
+    return lines.join('\n');
+  };
+  B.download = function () {
+    var blob = new Blob([B.text()], {type: 'text/plain;charset=utf-8'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'isheika-boot-log.txt';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+  window.addEventListener('error', function (e) {
+    var t = e.target;
+    if (t && t !== window && (t.src || t.href)) {
+      B.log('Ресурс не загрузился: ' + (t.src || t.href), 'fail',
+            'проверьте, что сервер отдаёт файл, а не страницу');
+    } else {
+      B.log('Ошибка сценария: ' + (e.message || ''), 'fail',
+            (e.filename || '') + ':' + (e.lineno || '') + ' ' + (e.error && e.error.stack ? String(e.error.stack).split('\n')[1] || '' : ''));
+    }
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason || {};
+    B.log('Необработанное отклонение промиса', 'fail', r.message || String(r));
+  });
+  B.log('Документ получен', 'ok', location.href);
+  document.addEventListener('DOMContentLoaded', function () {
+    B.log('Разметка загружена', 'ok', 'сценариев: ' + document.scripts.length);
+    var expect = ['charts.js', 'screens_core.js', 'screens_registry.js', 'screens_v11.js', 'screens_ops.js', 'screens_journal.js', 'app.js'];
+    expect.forEach(function (name) {
+      var el = document.querySelector('script[src="' + name + '"]');
+      B.log('Сценарий ' + name, el ? 'ok' : 'fail', el ? 'объявлен' : 'отсутствует в разметке');
+    });
+    var charts = B.mod('Charts', function () { return typeof Charts !== 'undefined' ? Charts : null; });
+    var screens = B.mod('Screens', function () { return typeof Screens !== 'undefined' ? Screens : null; });
+    var app = B.mod('App', function () { return typeof App !== 'undefined' ? App : null; });
+    B.log('Объект Charts', charts ? 'ok' : 'fail',
+          charts ? 'загружен: ' + Object.keys(charts).length + ' функций инфографики'
+                 : 'не определён — сценарий charts.js не выполнился');
+    B.log('Объект Screens', screens ? 'ok' : 'fail',
+          screens ? Object.keys(screens).length + ' экранов' : 'не определён — сценарии screens_*.js не выполнились');
+    B.log('Объект App', app ? 'ok' : 'fail',
+          app ? 'загружен' : 'не определён — сценарий app.js не выполнился');
+    B.fetchServer();
+    var dl = document.getElementById('boot-download');
+    if (dl) dl.addEventListener('click', B.download);
+    var rt = document.getElementById('boot-retry');
+    if (rt) rt.addEventListener('click', function () { location.reload(); });
+    var cn = document.getElementById('boot-continue');
+    if (cn) cn.addEventListener('click', B.dismiss);
+    var sv = document.getElementById('boot-server');
+    if (sv) sv.addEventListener('click', function () { B.fetchServer(); });
+    setTimeout(function () {
+      if (!window.App || !window.App.S) { B.log('Интерфейс не инициализирован за 12 с', 'fail', 'см. строки выше'); B.show(); }
+      else if (B.failed) B.show();
+    }, 12000);
+  });
+})();
+</script>
+
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🛰️</text></svg>">
 </head>
 <body>
+<div id="boot" class="boot-wrap">
+  <div class="boot-card">
+    <h1>ИЩЕЙКА НТР AI — журнал загрузки</h1>
+    <p class="muted tiny" id="boot-status">Загрузка…</p>
+    <div class="boot-log" id="boot-log">Ожидание разметки…</div>
+    <div class="boot-actions" id="boot-actions" hidden>
+      <button class="btn primary" id="boot-retry" type="button">Повторить загрузку</button>
+      <button class="btn" id="boot-continue" type="button" hidden>Продолжить работу</button>
+      <button class="btn" id="boot-download" type="button">Скачать журнал</button>
+      <button class="btn" id="boot-server" type="button">Обновить журнал сервера</button>
+      <a class="btn" href="api/v1/boot-log/export?fmt=txt">Журнал сервера (txt)</a>
+    </div>
+    <p class="tiny muted">Журнал показывает каждый шаг запуска браузера и сервера: загрузку сценариев,
+       ответ API, целостность БД, полноту реестров и наличие ресурсов интерфейса. Ключи и персональные
+       данные в журнал не попадают.</p>
+  </div>
+</div>
+
 <div id="login" class="login-wrap" hidden>
   <form class="login-card" id="login-form">
     <h1>ИЩЕЙКА НТР AI</h1>
@@ -24,7 +206,7 @@
 <div id="app" class="layout" hidden>
   <header class="topbar">
     <button class="icon-btn" id="menu-toggle" title="Свернуть меню" aria-label="Свернуть меню">☰</button>
-    <div class="brand"><span class="logo">🛰️</span><b>ИЩЕЙКА НТР AI</b><span class="ver">v0.1 · DEV</span></div>
+    <div class="brand"><span class="logo">🛰️</span><b>ИЩЕЙКА НТР AI</b><span class="ver" id="app-ver">версия…</span></div>
     <div class="global-search">
       <input id="global-search" type="search" placeholder="Глобальный поиск: технология, изделие, организация…" aria-label="Глобальный поиск">
       <button class="btn" id="global-search-btn">Найти</button>
@@ -32,6 +214,7 @@
     <div class="topbar-right">
       <span id="sys-status" class="pill" title="Состояние системы">● система</span>
       <button class="icon-btn" id="notif-btn" title="Уведомления" aria-label="Уведомления">🔔<span id="notif-count" class="badge">0</span></button>
+      <button class="icon-btn" id="boot-btn" title="Журнал загрузки и самопроверка" aria-label="Журнал загрузки">🧾</button>
       <button class="icon-btn" id="theme-btn" title="Светлая/тёмная тема" aria-label="Переключить тему">🌓</button>
       <span id="project" class="pill">проект DEMO</span>
       <span id="user" class="pill user">—</span>
@@ -70,6 +253,8 @@
 <script src="screens_core.js"></script>
 <script src="screens_registry.js"></script>
 <script src="screens_v11.js"></script>
+<script src="screens_ops.js"></script>
+<script src="screens_journal.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

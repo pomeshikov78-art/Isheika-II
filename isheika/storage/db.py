@@ -33,6 +33,16 @@ def connect() -> sqlite3.Connection:
     return conn
 
 
+def close() -> None:
+    """Закрытие соединения текущего потока (нужно при восстановлении из копии)."""
+    conn = getattr(_LOCAL, "conn", None)
+    if conn is not None:
+        try:
+            conn.close()
+        finally:
+            _LOCAL.conn = None
+
+
 def init_db() -> None:
     """Создание схемы + применение миграций редакции v1.1 (см. storage/migrate.py)."""
     from . import migrate

@@ -1,0 +1,14 @@
+{
+  "name": "isheika-ntr-ai-devtools",
+  "version": "1.4.0",
+  "private": true,
+  "description": "Dev-инструменты проверки интерфейса «ИЩЕЙКА НТР AI». В рантайме не используются: ядро на стандартной библиотеке Python 3.11+.",
+  "scripts": {
+    "ui": "node tools/ui_check.mjs",
+    "pdf": "node tools/pdf_check.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1",
+    "pdfjs-dist": "^5.6.205"
+  }
+}

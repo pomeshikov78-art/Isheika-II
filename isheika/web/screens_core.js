@@ -979,7 +979,10 @@ window.Screens = window.Screens || {};
           ${App.kv({'Статус': App.statusTag(r.status), 'Методика': esc(r.methodology_version),
             'Хеш снимка': '<code>' + esc(String(r.snapshot_hash || '').slice(0, 16)) + '</code>',
             'ID': '<code>' + esc(r.id) + '</code>'})}
-          <div class="row" style="margin-top:8px">${Object.keys(r.files || {}).map(f => `<a class="btn sm" href="${App.fileURL('/api/v1/reports/' + r.id + '/file', {fmt: f})}" target="_blank">${esc(f.toUpperCase())} ↗</a>`).join('')}</div>
+          <div class="row" style="margin-top:8px">${Object.keys(r.files || {}).map(f => (r.missing_files || []).includes(f)
+            ? `<button class="btn sm" disabled title="Файл отсутствует на диске — сформируйте отчёт заново">${esc(f.toUpperCase())} ⚠</button>`
+            : `<a class="btn sm" href="${App.fileURL('/api/v1/reports/' + r.id + '/file', {fmt: f})}" target="_blank">${esc(f.toUpperCase())} ↗</a>`).join('')}</div>
+          ${(r.missing_files || []).length ? App.alert('warn', 'Файлы отчёта отсутствуют на диске: ' + r.missing_files.map(f => esc(f.toUpperCase())).join(', ') + '. Запись отчёта сохранена, сами файлы — нет (перенос состояния или чистка каталога var/files). Нажмите «Сформировать отчёт», чтобы создать их заново.') : ''}
           ${(r.warnings || []).length ? App.alert('warn', (r.warnings || []).map(esc).join('<br>')) : ''}`)).join('');
       };
       paintReports(d.items || []);

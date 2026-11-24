@@ -227,6 +227,16 @@ def _log_api(kind: str, target: str, url: str, status: int | None, duration_ms: 
             **{k: v for k, v in telemetry.current().items()}})
     except Exception:
         pass
+    try:
+        from .. import journal
+        bad = bool(error_code) or (status is not None and status >= 400)
+        journal.record("warn" if bad else "debug", "connector", f"{kind}:{target}",
+                       message=_strip_secrets(url or ""), source="connector",
+                       outcome="fail" if bad else "ok", http_status=status, duration_ms=duration_ms,
+                       research_id=research_id, error_code=error_code,
+                       detail={"url": _strip_secrets(url or ""), "bytes": nbytes, "cached": bool(cached)})
+    except Exception:
+        pass
 
 
 SECRET_QS = re.compile(r"([?&](?:key|api_key|apikey|token|access_token|auth|password)=)[^&]+", re.I)

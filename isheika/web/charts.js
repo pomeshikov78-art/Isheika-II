@@ -287,3 +287,12 @@ const Charts = (() => {
 
   return {line, bar, radar, fan, riskMatrix, heatmap, graph, network, range, palette, esc, REL_COLORS};
 })();
+
+/* Публикация модуля в window обязательна (BOOT-08).
+   `const Charts` создаёт лексическую привязку глобальной области, а НЕ свойство
+   window: соседние сценарии видят Charts, но `window.Charts === undefined`.
+   Диагностика загрузки в index.html проверяла именно window.Charts и на
+   полностью рабочем интерфейсе выдавала ложный «FAIL Объект Charts — не определён»,
+   из-за чего экран журнала загрузки не скрывался (регрессия BOOT-08 / STAT-07).
+   Тот же приём, что и window.App / window.Screens в остальных модулях. */
+window.Charts = Charts;

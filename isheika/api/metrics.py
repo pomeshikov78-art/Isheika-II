@@ -87,4 +87,27 @@ def render() -> str:
     share = (partial.get("p") or 0) / partial["n"] if partial.get("n") else 0.0
     metric("isheika_research_partial_share", "Доля исследований со статусом partial", "gauge",
            [({}, round(share, 4))])
+
+    # --- ROADMAP P6 (ред. 1.3): SLO доступности, алерты, резервные копии ---
+    from .. import slo
+    metric("isheika_slo_target", "Целевая доступность, %", "gauge", [({}, slo.TARGET_AVAILABILITY)])
+    metric("isheika_slo_availability", "Доступность по самопроверкам, %", "gauge",
+           [({"window": name}, st["availability_pct"]) for name, hours in slo.WINDOWS
+            for st in [slo.window_stats(hours)] if st["availability_pct"] is not None])
+    metric("isheika_slo_error_budget_used", "Израсходовано бюджета ошибок, %", "gauge",
+           [({"window": name}, st["error_budget_used_pct"]) for name, hours in slo.WINDOWS
+            for st in [slo.window_stats(hours)] if st["error_budget_used_pct"] is not None])
+    metric("isheika_slo_probes_total", "Самопроверки по компонентам и результату", "counter",
+           [({"component": r["component"], "ok": str(bool(r["ok"]))}, r["n"]) for r in
+            db.query("SELECT component, ok, COUNT(*) AS n FROM service_probes GROUP BY component, ok")])
+    metric("isheika_slo_probe_latency_ms_avg", "Средняя длительность самопроверки, мс", "gauge",
+           [({"component": r["component"]}, round(r["ms"] or 0, 3)) for r in
+            db.query("SELECT component, AVG(latency_ms) AS ms FROM service_probes GROUP BY component")])
+    metric("isheika_alerts_open", "Открытые алерты эксплуатации", "gauge",
+           [({"rule": r["rule_code"], "severity": r["severity"]}, r["n"]) for r in
+            db.query("""SELECT rule_code, severity, COUNT(*) AS n FROM ops_alerts
+                        WHERE state<>'closed' GROUP BY rule_code, severity""")])
+    metric("isheika_backups_total", "Резервные копии по типу", "counter",
+           [({"kind": r["kind"] or "manual"}, r["n"]) for r in
+            db.query("SELECT kind, COUNT(*) AS n FROM ops_backups GROUP BY kind")])
     return "\n".join(lines) + "\n"

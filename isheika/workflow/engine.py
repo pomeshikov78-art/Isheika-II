@@ -216,6 +216,16 @@ def _run_stages(research_id: str) -> None:
                               error_code="E_INTERNAL", error_message=str(e)[:500])
                 events.emit("job.failed", research_id=research_id, job_id=job["id"], severity="error",
                             payload={"stage": stage, "code": "E_INTERNAL", "message": str(e)[:300], "trace": tb})
+                # Полный traceback этапа — в журнал действий: событие хранит хвост,
+                # а для разбора дефекта нужна вся цепочка вызовов (ред. 1.4.0).
+                try:
+                    from .. import journal
+                    journal.error(e, "workflow", f"stage.{stage}", message=str(e),
+                                  source="workflow", research_id=research_id, job_id=job["id"],
+                                  error_code="E_INTERNAL", entity_kind="job", entity_id=job["id"],
+                                  detail={"stage": stage, "name": name, "attempt": job["attempts"] + 1})
+                except Exception:
+                    pass
         if is_cancelled(research_id):
             final = "cancelled"
         elif failed and not partial:
@@ -233,6 +243,13 @@ def _run_stages(research_id: str) -> None:
         except Exception:
             pass
         events.emit("system.error", research_id=research_id, severity="error", payload={"message": str(e)[:300]})
+        try:
+            from .. import journal
+            journal.error(e, "workflow", "research.run", message=str(e), source="workflow",
+                          research_id=research_id, error_code="E_INTERNAL",
+                          entity_kind="research", entity_id=research_id)
+        except Exception:
+            pass
     finally:
         with _LOCK:
             _RUNNING.pop(research_id, None)
