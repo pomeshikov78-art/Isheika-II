@@ -33,6 +33,84 @@ const App = (() => {
     sse: null, sseOk: false, lastSync: null, jobsRunning: 0, theme: store.get('isheika.theme') || 'light',
   };
 
+  // ---------------------------------------------------------------- состояние связи (ред. 1.4.1)
+  /* Недоступность сервера — не конец работы: сервер может перезапускаться или
+     быть недоступен минуту (замечание пользователя: E_NETWORK на UI-24 и UI-32,
+     экраны оставались «недоступны» до перезагрузки страницы). Теперь:
+       * безопасные запросы повторяются сами (3 попытки с паузами);
+       * ответы шлюза 502/503/504 без тела API считаются недоступностью, а не ошибкой данных;
+       * при отказе включается автопереподключение, и после ответа сервера экран
+         перерисовывается сам;
+       * события журнала, не доставленные во время отказа, ждут в localStorage
+         и досылаются после восстановления (раньше они терялись навсегда). */
+  const NET = {tries: 0, probe: null, delay: 4000, wasOffline: false, lastError: ''};
+  const QUEUE_KEY = 'isheika.journal.queue';
+  const QUEUE_MAX = 50;
+  const queueRead = () => { try { return JSON.parse(store.get(QUEUE_KEY) || '[]') || []; } catch (e) { return []; } };
+  const queueWrite = list => store.set(QUEUE_KEY, JSON.stringify((list || []).slice(-QUEUE_MAX)));
+  function queuePush(payload) { const l = queueRead(); l.push(payload); queueWrite(l); paintConn(); }
+  const journalQueueSize = () => queueRead().length;
+
+  async function flushJournal() {
+    const list = queueRead();
+    if (!list.length) return 0;
+    const rest = []; let sent = 0;
+    for (const p of list) {
+      try {
+        const headers = {'Content-Type': 'application/json'};
+        if (S.token) headers['Authorization'] = 'Bearer ' + S.token;
+        const body = JSON.stringify(Object.assign({}, p, {queued_at: p.queued_at || new Date().toISOString()}));
+        const r = await fetch('api/v1/journal/client', {method: 'POST', headers, body, keepalive: true});
+        if (r && r.ok) { sent += 1; continue; }
+        if (r && (r.status === 422 || r.status === 429)) continue;   // битое или лишнее событие не держим
+        rest.push(p);
+      } catch (e) { rest.push(p); }
+    }
+    queueWrite(rest); paintConn();
+    return sent;
+  }
+
+  async function probeServer() {
+    try {
+      const r = await fetch('api/v1/system', {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+      if (r && r.ok) { markOnline(); return true; }
+    } catch (e) { /* сервер ещё недоступен */ }
+    return false;
+  }
+  function startProbe() {
+    if (NET.probe) return;
+    const tick = async () => {
+      NET.probe = null;
+      const ok = await probeServer();
+      if (!ok && !S.online) {
+        NET.tries += 1;
+        NET.delay = Math.min(15000, 4000 + NET.tries * 1000);
+        NET.probe = setTimeout(tick, NET.delay);
+        paintConn();
+      }
+    };
+    NET.probe = setTimeout(tick, NET.delay);
+  }
+  function stopProbe() { if (NET.probe) { clearTimeout(NET.probe); NET.probe = null; } }
+  function markOffline(reason) {
+    NET.lastError = reason || NET.lastError;
+    if (!S.online) { startProbe(); return; }
+    S.online = false; NET.wasOffline = true; paintConn(); startProbe();
+  }
+  function markOnline() {
+    const back = !S.online && NET.wasOffline;
+    S.online = true; S.lastSync = new Date(); NET.tries = 0; NET.delay = 4000; NET.lastError = '';
+    stopProbe(); paintConn();
+    if (back) {
+      NET.wasOffline = false;
+      flushJournal().then(n => toast('Соединение восстановлено' +
+        (n ? ': отправлено событий журнала — ' + n : '') + '. Экран обновлён.', 'ok'));
+      if (S.route) render();
+    }
+  }
+  window.addEventListener('online', () => probeServer());
+  window.addEventListener('offline', () => markOffline('браузер сообщил об отсутствии сети'));
+
   // ---------------------------------------------------------------- API-клиент
   async function api(path, opts = {}) {
     const {method = 'GET', body, query, idem} = opts;
@@ -44,39 +122,56 @@ const App = (() => {
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (idem) headers['Idempotency-Key'] = idem;
     if (S.researchId) headers['X-Correlation-ID'] = S.researchId;
-    let res;
     const limit = opts.timeout || 45000;
-    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timer = ctrl ? setTimeout(() => ctrl.abort(), limit) : null;
-    try {
-      res = await fetch(url.toString(), {method, headers, body: body !== undefined ? JSON.stringify(body) : undefined,
-                                         signal: ctrl ? ctrl.signal : undefined});
-    } catch (e) {
-      S.online = false; paintConn();
-      const timedOut = ctrl && ctrl.signal.aborted;
-      const netErr = {code: 'E_NETWORK',
-             message: timedOut ? 'Сервер не ответил за ' + Math.round(limit / 1000) + ' с: ' + path
-                               : 'Сервер недоступен. Проверьте соединение — данные могли устареть.',
-             request_id: rid, offline: true};
-      reportClient({action: 'api.' + method + ' ' + path, message: netErr.message, code: 'E_NETWORK',
-                    type: timedOut ? 'TimeoutError' : 'NetworkError'});
-      throw netErr;
-    } finally { if (timer) clearTimeout(timer); }
-    S.online = true; S.lastSync = new Date(); paintConn();
-    let data = {};
-    try { data = await res.json(); } catch (e) { data = {}; }
-    if (!res.ok) {
-      const err = (data && data.error) || {code: 'E_INTERNAL', message: 'HTTP ' + res.status};
-      err.http = res.status; err.request_id = err.request_id || rid;
-      // В журнал — то, что похоже на дефект, а не на ожидаемый отказ прав/валидации.
-      if (res.status >= 500 || ['E_INTERNAL', 'E_SCHEMA', 'E_PROVIDER'].includes(err.code)) {
-        reportClient({action: 'api.' + method + ' ' + path, message: err.message, code: err.code,
-                      type: 'ApiError', detail: {http: res.status, request_id: err.request_id}});
+    // повтор допустим только для безопасных или идемпотентных запросов
+    const safe = method === 'GET' || method === 'HEAD' || !!idem;
+    const attempts = opts.attempts || (safe ? 3 : 1);
+    const req = {method, headers, body: body !== undefined ? JSON.stringify(body) : undefined};
+    let netErr = null;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      if (attempt > 1) await sleep(600 * (attempt - 1) * (attempt - 1) + Math.round(Math.random() * 250));
+      let res;
+      const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timer = ctrl ? setTimeout(() => ctrl.abort(), limit) : null;
+      try {
+        res = await fetch(url.toString(), Object.assign({}, req, {signal: ctrl ? ctrl.signal : undefined}));
+      } catch (e) {
+        const timedOut = ctrl && ctrl.signal.aborted;
+        netErr = {code: 'E_NETWORK',
+               message: timedOut ? 'Сервер не ответил за ' + Math.round(limit / 1000) + ' с: ' + path
+                                 : 'Сервер недоступен. Проверьте соединение — данные могли устареть.',
+               request_id: rid, offline: true, attempts: attempt};
+        markOffline(netErr.message);
+        continue;
+      } finally { if (timer) clearTimeout(timer); }
+      let data = {};
+      try { data = await res.json(); } catch (e) { data = {}; }
+      // Ответ шлюза (502/503/504 без тела API) — недоступность сервера, а не ошибка данных.
+      if ([502, 503, 504].includes(res.status) && !(data && data.error)) {
+        netErr = {code: 'E_NETWORK', http: res.status, request_id: rid, offline: true, attempts: attempt,
+                  message: 'Шлюз вернул HTTP ' + res.status + ': сервер не отвечает. Данные могли устареть.'};
+        markOffline(netErr.message);
+        continue;
       }
-      if (res.status === 401 && S.user) { toast('Сессия истекла — требуется повторный вход', 'warn'); logout(false); }
-      throw err;
+      markOnline();
+      if (!res.ok) {
+        const err = (data && data.error) || {code: 'E_INTERNAL', message: 'HTTP ' + res.status};
+        err.http = res.status; err.request_id = err.request_id || rid;
+        // В журнал — то, что похоже на дефект, а не на ожидаемый отказ прав/валидации.
+        if (res.status >= 500 || ['E_INTERNAL', 'E_SCHEMA', 'E_PROVIDER'].includes(err.code)) {
+          reportClient({action: 'api.' + method + ' ' + path, message: err.message, code: err.code,
+                        type: 'ApiError', detail: {http: res.status, request_id: err.request_id}});
+        }
+        if (res.status === 401 && S.user) { toast('Сессия истекла — требуется повторный вход', 'warn'); logout(false); }
+        throw err;
+      }
+      return data;
     }
-    return data;
+    netErr = netErr || {code: 'E_NETWORK', message: 'Сервер недоступен: ' + path, request_id: rid, offline: true};
+    reportClient({action: 'api.' + method + ' ' + path, message: netErr.message, code: 'E_NETWORK',
+                  type: netErr.http ? 'GatewayError' : 'NetworkError',
+                  detail: {http: netErr.http || 0, attempts: netErr.attempts || attempts, request_id: rid}});
+    throw netErr;
   }
   const get = (p, query) => api(p, {query});
   const post = (p, body, idem) => api(p, {method: 'POST', body: body || {}, idem});
@@ -87,10 +182,9 @@ const App = (() => {
      и терялись при перезагрузке — найти дефект у пользователя было нечем.
      Отправка идёт напрямую через fetch (не через api), чтобы отказ самого
      журнала не порождал новую запись об отказе. */
-  let jrnSent = 0, jrnMuted = false;
+  let jrnSent = 0;
   function reportClient(ev) {
-    if (jrnMuted || jrnSent >= 60) return;
-    jrnSent += 1;
+    if (jrnSent >= 200) return;      // предохранитель от лавины; считаем только доставленные
     const payload = {
       level: ev.level || 'error', kind: ev.kind || 'ui', action: ev.action || 'browser.event',
       message: String(ev.message || '').slice(0, 1200),
@@ -102,13 +196,20 @@ const App = (() => {
       boot_id: (window.__isheikaBoot && window.__isheikaBoot.server && window.__isheikaBoot.server.boot_id) || '',
       detail: ev.detail || {},
     };
+    // Отказ доставки НЕ отключает журнал: событие ждёт в очереди и уходит позже.
     try {
       const headers = {'Content-Type': 'application/json'};
       if (S.token) headers['Authorization'] = 'Bearer ' + S.token;
       const p = fetch('api/v1/journal/client', {method: 'POST', headers, keepalive: true,
                                                body: JSON.stringify(payload)});
-      if (p && p.catch) p.catch(() => { jrnMuted = true; });   // сервер недоступен — не шумим
-    } catch (e) { jrnMuted = true; }
+      if (p && p.then) {
+        p.then(r => {
+          if (r && r.ok) { jrnSent += 1; return; }
+          if (r && (r.status === 422 || r.status === 429)) return;   // брак/лимит — не копим
+          queuePush(payload); markOffline('журнал не принял событие: HTTP ' + (r && r.status));
+        }).catch(() => { queuePush(payload); markOffline('журнал недоступен'); });
+      } else { jrnSent += 1; }
+    } catch (e) { queuePush(payload); }
   }
   window.addEventListener('error', e => {
     if (e && e.target && e.target !== window && (e.target.src || e.target.href)) {
@@ -189,7 +290,7 @@ const App = (() => {
       E_FORBIDDEN: 'Недостаточно прав для операции.',
       E_POLICY: 'Операция запрещена политикой безопасности (стоп-лист, paywall, robots).',
       E_ROBOTS: 'Источник запрещает автоматический доступ по robots.txt.',
-      E_NETWORK: 'Сетевая недоступность. Результаты могут быть частичными.',
+      E_NETWORK: 'Сетевая недоступность. Приложение само повторяет запрос и обновит экран, когда сервер ответит; события журнала сохранены в очереди и будут досланы.',
       E_SCHEMA: 'Ответ не соответствует JSON Schema. Ограниченная попытка исправления выполнена.',
       E_PROVIDER: 'Ошибка провайдера ИИ. Возможен переход на бесплатную альтернативу.',
     }[code] || '';
@@ -199,7 +300,8 @@ const App = (() => {
       <div class="tiny muted" style="margin-top:8px">${extra}</div>
       <div class="row" style="justify-content:center;margin-top:10px">
         <button class="btn sm" onclick="App.go('logs')">Подробный лог</button>
-        <button class="btn sm" onclick="App.render()">Повторить</button></div></div>`;
+        <button class="btn sm primary" onclick="App.retry()">Повторить</button>
+        ${code === 'E_NETWORK' ? '<button class="btn sm" onclick="App.retry()">Переподключиться</button>' : ''}</div></div>`;
   }
   function fail(host, e, ctx) { host.innerHTML = errorBlock(e, ctx); }
 
@@ -371,7 +473,11 @@ const App = (() => {
   function paintConn() {
     const el = $('st-conn'); if (!el) return;
     el.className = S.online ? 'ok' : 'bad';
-    el.textContent = 'соединение: ' + (S.online ? (S.sseOk ? 'активно (SSE)' : 'активно') : 'offline — данные могут устареть');
+    const q = journalQueueSize();
+    el.textContent = 'соединение: ' + (S.online ? (S.sseOk ? 'активно (SSE)' : 'активно')
+      : 'недоступно — переподключение' + (NET.tries ? ', попытка ' + NET.tries : ''))
+      + (q ? ' · событий журнала в очереди: ' + q : '');
+    el.title = S.online ? '' : (NET.lastError || 'Сервер не отвечает');
   }
   function paintStatus() {
     if (!S.system) return;
@@ -658,6 +764,8 @@ const App = (() => {
     table, exportCSV, download, fileURL, toast, modal, closeModal, ctx, ctxObject,
     loadResearches, setResearch, researchBar, wireResearchBar, needResearch, runResearch,
     go, render, refreshSystem, MENU, STATUS_RU, init, setTheme, logout, bootLogModal, reportClient,
+    retry: () => { probeServer(); return render(); },
+    flushJournal, journalQueueSize, probeServer, netState: NET,
   };
 })();
 

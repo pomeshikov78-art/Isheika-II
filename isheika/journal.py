@@ -390,6 +390,12 @@ def client_event(body: dict, *, peer: str = "", actor: str | None = None,
         "boot_id": _text(body.get("boot_id"), 80),
         "peer": _text(peer, 60),
     }
+    # Событие могло ждать в очереди браузера, пока сервер был недоступен (ред. 1.4.1).
+    # Время постановки в очередь сохраняем: иначе задержка выглядит «свежим» отказом.
+    queued_at = _text(body.get("queued_at"), 40)
+    if queued_at:
+        client["queued_at"] = queued_at
+        client["delivered_with_delay"] = True
     jid = record(level, kind, action, message, source="browser", actor=actor, role=role,
                  outcome="fail" if level in ("error", "critical") else "ok",
                  error_code=_text(body.get("error_code"), 40) or None,

@@ -91,19 +91,27 @@ window.Screens = window.Screens || {};
         const f = {level: params.level || '', kind: params.kind || '', source: params.source || '',
                    actor: params.actor || '', q: params.q || '', outcome: params.outcome || '',
                    research_id: params.scope === 'research' ? App.S.researchId : ''};
-        const [d, st] = await Promise.all([
+        // Частичная доступность: отказ сводки не должен лишать ленты (замечание
+        // пользователя — экран оставался «недоступен» целиком).
+        const [rd, rs] = await Promise.allSettled([
           App.get('/api/v1/journal', {...f, limit: 300}),
           App.get('/api/v1/journal/stats'),
         ]);
+        if (rd.status === 'rejected' && rs.status === 'rejected') throw rd.reason;
+        const d = rd.status === 'fulfilled' ? rd.value : {items: [], total: 0};
+        const st = rs.status === 'fulfilled' ? rs.value : {};
+        const partial = [rd, rs].filter(x => x.status === 'rejected')
+          .map(x => (x.reason && x.reason.message) || 'отказ запроса');
         const opt = (list, cur) => list.map(([k, n]) => `<option value="${k}" ${cur === k ? 'selected' : ''}>${n}</option>`).join('');
         const day = st.last_24h || {};
         host.innerHTML = head + `
           <div class="grid g4">
-            ${App.kpi('Записей в журнале', st.total ?? 0, 'политика хранения: ' + st.retention_days + ' сут.')}
+            ${App.kpi('Записей в журнале', st.total ?? d.total ?? 0, 'политика хранения: ' + (st.retention_days ?? '—') + ' сут.')}
             ${App.kpi('Ошибок за 24 ч', day.errors ?? 0, 'уровни error и critical')}
             ${App.kpi('Предупреждений за 24 ч', day.warnings ?? 0, 'уровень warn')}
             ${App.kpi('Ошибок браузера', st.browser_errors ?? 0, 'присланы интерфейсом')}
           </div>
+          ${partial.length ? App.alert('warn', 'Часть данных не получена: ' + esc(partial.join('; ')) + '. Показано то, что сервер отдал; приложение повторит запрос автоматически.') : ''}
           ${st.failed_writes ? App.alert('error', 'Сбои записи журнала: ' + st.failed_writes + '. Часть записей сохранена в var/journal-fallback.log — проверьте БД и диск.') : ''}
           ${App.card('Фильтры', `<div class="row">
             <select id="j-level">${opt([['', 'Все уровни'], ['info', 'Действия и выше'], ['warn', 'Предупреждения и выше'], ['error', 'Только ошибки'], ['debug', 'Включая отладку']], f.level)}</select>
@@ -238,9 +246,22 @@ window.Screens = window.Screens || {};
 
       // ---------------------------------------------------------- ошибки браузера
       const d = await App.get('/api/v1/journal', {source: 'browser', limit: 200});
+      const queued = App.journalQueueSize();
       host.innerHTML = head + `
         ${App.alert('info', 'Ошибки интерфейса присылает сам браузер (window.onerror, необработанные обещания, отказы API и рендеринга экранов). Они сохраняются на сервере и не теряются при перезагрузке вкладки.')}
+        ${queued ? App.alert('warn', 'Не доставлено событий: ' + queued + '. Они сохранены в браузере (localStorage) и будут отправлены, как только сервер ответит — в записи появится время постановки в очередь queued_at.') : ''}
+        <div class="row" style="margin-bottom:8px">
+          <button class="btn sm" id="jb-flush" ${queued ? '' : 'disabled'}>Отправить очередь (${queued})</button>
+          <span class="tiny muted">Очередь хранится локально, не более 50 событий; при недоступности сервера ошибки не теряются.</span>
+        </div>
         ${App.card('События браузера (' + d.total + ')', d.items.length ? '<div id="jb-tbl"></div>' : App.empty('Ошибок интерфейса не зафиксировано', '🖥️'))}`;
+      document.getElementById('jb-flush').addEventListener('click', async () => {
+        const b = document.getElementById('jb-flush');
+        b.disabled = true; b.textContent = 'Отправка…';
+        const n = await App.flushJournal();
+        App.toast(n ? 'Отправлено событий: ' + n : 'Сервер пока недоступен — очередь сохранена', n ? 'ok' : 'warn');
+        App.go('journal', {tab: 'browser'});
+      });
       App.table('jb-tbl', {
         rows: d.items, size: 25, sort: 'at', export: 'journal_browser',
         cols: [COLS[0], COLS[1],

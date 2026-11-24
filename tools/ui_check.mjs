@@ -292,6 +292,58 @@ t('ошибки: группировка по подписи дефекта', () 
   const html = window.document.getElementById('screen-body').innerHTML;
   return html.includes('Подпись') || html.includes('Ошибок не зафиксировано');
 });
+// --- ред. 1.4.1: недоступность сервера, автоповтор, очередь журнала
+const realFetch = window.fetch;
+let flakyCalls = 0;
+window.fetch = (input, init) => {
+  flakyCalls += 1;
+  if (flakyCalls === 1) return Promise.reject(new TypeError('Failed to fetch'));
+  return realFetch(input, init);
+};
+const retried = await App.get('/api/v1/system');
+t('сеть: безопасный запрос повторяется сам', () =>
+  (flakyCalls >= 2 && retried && retried.version) ? true : `попыток: ${flakyCalls}`);
+window.fetch = realFetch;
+
+// шлюз вернул 502 без тела API — это недоступность сервера, а не ошибка данных
+window.fetch = () => Promise.resolve({ok: false, status: 502,
+  json: async () => ({sandboxId: 'sbx', message: 'The sandbox was not found'})});
+let gw = null;
+try { await App.get('/api/v1/logs', {limit: 5}); } catch (e) { gw = e; }
+t('сеть: ответ шлюза 502 распознан как E_NETWORK', () =>
+  (gw && gw.code === 'E_NETWORK' && gw.http === 502) ? true : JSON.stringify(gw));
+window.fetch = realFetch;
+await App.probeServer();
+
+// полная недоступность: событие журнала должно ждать в очереди, а не потеряться
+window.fetch = () => Promise.reject(new TypeError('Failed to fetch'));
+let netErr = null;
+try { await App.get('/api/v1/journal', {limit: 5}); } catch (e) { netErr = e; }
+t('сеть: отказ классифицирован как E_NETWORK', () => (netErr && netErr.code === 'E_NETWORK') ? true : JSON.stringify(netErr));
+const qBefore = App.journalQueueSize();
+App.reportClient({action: 'ui_check.offline', message: 'Событие, случившееся при недоступности сервера',
+                  type: 'NetworkError'});
+await sleep(600);
+t('журнал: событие сохранено в очереди браузера', () =>
+  App.journalQueueSize() > qBefore ? true : `очередь: ${App.journalQueueSize()}`);
+t('сеть: включено автопереподключение', () =>
+  (App.S.online === false && App.netState.probe !== null) ? true : `online=${App.S.online}`);
+// сервер «вернулся»: восстановление должно произойти САМО, по таймеру пробы,
+// без ручного вызова и без перезагрузки страницы (замечание пользователя).
+window.fetch = realFetch;
+await sleep(8000);
+t('сеть: восстановление происходит само по таймеру', () =>
+  (App.S.online === true && App.netState.probe === null) ? true : `online=${App.S.online}, проба=${App.netState.probe !== null}`);
+const backOk = await App.probeServer();
+await sleep(1200);
+t('сеть: экран работоспособен после восстановления', () =>
+  (backOk && App.S.online === true) ? true : `online=${App.S.online}`);
+const afterQueue = await App.get('/api/v1/journal', {source: 'browser', limit: 60});
+t('журнал: очередь дослана с отметкой queued_at', () =>
+  (afterQueue.items || []).some(e => e.action === 'ui_check.offline' && (e.client || {}).queued_at)
+    ? true : 'доставленное событие с queued_at не найдено');
+t('журнал: очередь браузера очищена', () => App.journalQueueSize() === 0 || `осталось ${App.journalQueueSize()}`);
+
 App.setTheme('dark');
 t('тёмная тема применяется', () => window.document.documentElement.dataset.theme === 'dark');
 App.setTheme('light');
