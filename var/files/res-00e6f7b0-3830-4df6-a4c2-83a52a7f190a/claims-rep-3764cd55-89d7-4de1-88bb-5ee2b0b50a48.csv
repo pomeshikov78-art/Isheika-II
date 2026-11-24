@@ -1,0 +1,17 @@
+﻿claim_id,type,status,confidence,text,produced_by
+clm-05a3e6f4-8a17-4fb3-b22c-e8a81f8dfda1,ANALYSIS,CONTRADICTED,0.5588,Патентная публикация: Patent application: apparatus for тропосферная связь OR тропосферное рассеяние OR тропосферная [3]. Подтверждает раскрытие/заявку; работоспособность изделия патентом не подтверждается.,A03:simulation:simulated
+clm-87f2f21d-d140-4e21-ad52-c25028c5b485,ANALYSIS,UNVERIFIED,0.5588,Experimental study of тропосферная связь OR тропосферное рассеяние OR тропосферная: measured performance [1] — описаны результаты исследования,A02:simulation:simulated
+clm-419533a3-b51a-4442-b6f0-ef2c33151053,ANALYSIS,UNVERIFIED,0.5588,Technical report: тропосферная связь OR тропосферное рассеяние OR тропосферная prototype trials [2] — описаны результаты исследования,A02:simulation:simulated
+clm-da7f88fd-af4c-45bd-9ac6-d74ff1046f10,ANALYSIS,UNVERIFIED,0.5588,Preprint: advances in тропосферная связь OR тропосферное рассеяние OR тропосферная [4] — описаны результаты исследования,A02:simulation:simulated
+clm-1e2de949-248d-4d52-a0bc-921967653394,ANALYSIS,UNVERIFIED,0.5587,Признак промышленной реализации: Technical report: тропосферная связь OR тропосферное рассеяние OR тропосферная prototype trials [2],A04:simulation:simulated
+clm-abb91449-2270-49d8-8cb7-c02397478e45,ANALYSIS,UNVERIFIED,,CN: 1 документов в выборке,A05:simulation:simulated
+clm-a04d9cd4-68e5-4d77-8c0e-bee64f1da022,ANALYSIS,UNVERIFIED,,JP: 1 документов в выборке,A05:simulation:simulated
+clm-62d59d33-be18-4cf0-817f-1d80916348ac,ANALYSIS,UNVERIFIED,,DE: 1 документов в выборке,A05:simulation:simulated
+clm-8b3a782a-77de-4720-b159-bedfd82060cd,ANALYSIS,UNVERIFIED,,GB: 1 документов в выборке,A05:simulation:simulated
+clm-80418a51-c70b-41ac-9fef-12e7f758d479,ANALYSIS,UNVERIFIED,0.5588,Reported measurements of тропосферная связь OR тропосферное рассеяние OR тропосферная under laboratory conditions; parameters and test setup described. Prototype of тропосферная связь OR тропосферное рассеяние OR тропосферная tested in relevant environment; test protocol and results included. Early results on тропосферная связь OR тропосферное рассеяние OR тропосферная; not peer reviewed.,A06:simulation:simulated
+clm-1aa129fd-d771-41ff-9921-97d79cdf9c15,ANALYSIS,UNVERIFIED,,[independence] Более половины выборки из одной группы независимости (org:siminstitute) — повторные публикации не считаются независимыми подтверждениями,A11:simulation:simulated
+clm-2f2b60d1-31be-4384-9243-c3145630ff01,ANALYSIS,UNVERIFIED,,[gap] Не найдены измеренные численные параметры — оценка параметров невозможна,A11:simulation:simulated
+clm-1bbf1990-6493-44ee-8b86-3b71166d9391,FORECAST,UNVERIFIED,,Динамика публикаций: неопределённо. Экстраполяция ограничена доступной выборкой.,A10:simulation:simulated
+clm-f709fa1e-f324-4ad8-817b-081b8d77f2c1,FORECAST,UNVERIFIED,,Появление работоспособного прототипа зависит от подтверждения критической функции в релевантной среде.,A10:simulation:simulated
+clm-b9a0b1fd-9f00-48ae-bb92-7a3f15af1a9c,FORECAST,UNVERIFIED,,Промышленное производство требует компонентной базы и нормативной готовности.,A10:simulation:simulated
+clm-06d7f6ce-3ac4-4392-9059-c3e4c2929b0d,FORECAST,UNVERIFIED,,На горизонте 20–50 лет допустимы только качественные сценарии и широкие интервалы.,A10:simulation:simulated

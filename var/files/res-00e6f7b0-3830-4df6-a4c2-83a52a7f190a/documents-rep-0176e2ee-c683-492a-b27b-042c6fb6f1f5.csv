@@ -1,0 +1,5 @@
+﻿document_id,title,url,type,source,country,language,published_at,relevance,class,evidence_class,marker,doi
+doc-296a0290-5edb-4e0e-b23f-00ae97d0b721,Experimental study of тропосферная связь OR тропосферное рассеяние OR тропосферная: measured performance [1],https://example.invalid/sim/4018111669/0,article,SRC-X-CON-SIM,CN,en,2017-06-01,0.8414251010801168,DIRECT,primary_peer_reviewed,Д,
+doc-0778c8f8-42ec-4991-8870-79a008644950,Technical report: тропосферная связь OR тропосферное рассеяние OR тропосферная prototype trials [2],https://example.invalid/sim/4018111669/1,report,SRC-X-CON-SIM,JP,en,2012-06-01,0.8228650889375341,DIRECT,primary_report,Д,
+doc-9dc74c2f-fef9-409e-823e-0ecda331127b,Preprint: advances in тропосферная связь OR тропосферное рассеяние OR тропосферная [4],https://example.invalid/sim/4018111669/3,preprint,SRC-X-CON-SIM,DE,en,2026-06-01,0.8085,DIRECT,preprint,Д,
+doc-e918ad8e-da30-4c2b-aa0f-ebb39ac89b5a,Patent application: apparatus for тропосферная связь OR тропосферное рассеяние OR тропосферная [3],https://example.invalid/sim/4018111669/2,patent,SRC-X-CON-SIM,GB,en,2014-06-01,0.7836776695296637,ADJACENT,patent,Д,

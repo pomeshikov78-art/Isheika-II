@@ -1,0 +1,13 @@
+﻿claim_id,type,status,confidence,text,produced_by
+clm-1e608c12-8e51-43d8-8af1-1af460eca4b2,ANALYSIS,PARTIAL,0.95,Long Duration Maritime Troposcatter Experiment — описаны результаты исследования,A02:simulation:simulated
+clm-d93b6f14-fc01-4cc6-8484-00a3ba6e073c,ANALYSIS,PARTIAL,0.95,Beyond-line-of-sight physical-layer chaos communication based on troposcatter. — приведены измеренные значения параметров,A02:simulation:simulated
+clm-c2105fea-b981-45e4-b866-61b47de88fbf,ANALYSIS,PARTIAL,0.95,Fading Measurements From a Maritime Mobile Troposcatter Link — описаны результаты исследования,A02:simulation:simulated
+clm-1b786246-55a0-40ea-9f6e-8bf7b59ba516,ANALYSIS,PARTIAL,0.95,Prospects of Troposcatter Systems in Military Communication Networks — описаны результаты исследования,A02:simulation:simulated
+clm-a614eb52-67b6-41f8-a5e1-37dd45134774,ANALYSIS,PARTIAL,0.95,"Tropospheric scatter, also known as troposcatter, communications has been around since the 1950s but has recently received interest as a means for long distance beyond line-of-sight (BLOS) communications. This paper deta We propose and demonstrate a scheme of beyond-line-of-sight (BLOS) physical-layer chaos communication based on troposcatter. In this scheme, a physical-layer chaos synchronization induced by a common digital signal betwe Tropospheric scatter, also known as troposcatter, communications has been around since the 1950s but has recently received interest as a means for long distance beyond line-of-sight (BLOS) communications. According to th",A06:simulation:simulated
+clm-ad2690f4-2829-4fe9-bc7b-bbb87268e2c9,ANALYSIS,UNVERIFIED,,US: 2 документов в выборке,A05:simulation:simulated
+clm-75fa1f2b-e8b9-4261-9d11-82d147203093,ANALYSIS,UNVERIFIED,,RO: 1 документов в выборке,A05:simulation:simulated
+clm-9eb87ba3-2e66-42f2-a46e-45d57f064489,ANALYSIS,UNVERIFIED,,[gap] Патентная база не подтверждена — правовой ландшафт неизвестен,A11:simulation:simulated
+clm-ee08dc55-bab9-4201-98c6-d26ecb033a3e,FORECAST,UNVERIFIED,,Динамика публикаций: неопределённо. Экстраполяция ограничена доступной выборкой.,A10:simulation:simulated
+clm-7266dfc8-9a3d-465c-a808-495706b85944,FORECAST,UNVERIFIED,,Появление работоспособного прототипа зависит от подтверждения критической функции в релевантной среде.,A10:simulation:simulated
+clm-f9feb64b-e233-49d0-a636-08112666c83d,FORECAST,UNVERIFIED,,Промышленное производство требует компонентной базы и нормативной готовности.,A10:simulation:simulated
+clm-b2bfd8e0-03d8-41b7-aa38-0d5458bcbaab,FORECAST,UNVERIFIED,,На горизонте 20–50 лет допустимы только качественные сценарии и широкие интервалы.,A10:simulation:simulated
