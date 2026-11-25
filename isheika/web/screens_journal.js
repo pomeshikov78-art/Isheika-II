@@ -200,15 +200,18 @@ window.Screens = window.Screens || {};
         const scope = params.scope === 'research' ? App.S.researchId : '';
         const d = await App.get('/api/v1/diagnostics', scope ? {research_id: scope} : {});
         const c = d.counts || {};
+        const real = (d.findings || []).filter(f => f.severity !== 'info');
+        const info = (d.findings || []).length - real.length;
         host.innerHTML = head + `
           <div class="grid g4">
             ${App.kpi('Правил проверки', d.rules ?? 0, 'состояния, расчёты, доказательства, политика')}
-            ${App.kpi('Противоречий', (d.findings || []).length, 'уникальных расхождений')}
+            ${App.kpi('Противоречий', real.length, 'уникальных расхождений' + (info ? ' · справок: ' + info : ''))}
             ${App.kpi('Случаев', d.cases ?? 0, 'всего затронутых объектов')}
             ${App.kpi('Критичных / ошибок', (c.critical || 0) + ' / ' + (c.error || 0), 'предупреждений: ' + (c.warn || 0))}
           </div>
           ${App.alert(d.ok ? 'ok' : (c.critical || c.error) ? 'error' : 'warn', d.ok
             ? 'Противоречий не найдено: состояние, расчёты и доказательства согласованы с ТЗ.'
+              + (info ? ' Ниже — ' + info + ' справка(и) по записям прежних версий журнала.' : '')
             : 'Найдены расхождения с правилами предметной области. Каждое сопровождается идентификаторами и рекомендацией.')}
           ${(d.broken_rules || []).length ? App.alert('error', 'Не выполнились правила: ' + d.broken_rules.map(b => esc(b.rule + ' — ' + b.error)).join('; ')) : ''}
           <div class="row">
@@ -221,7 +224,7 @@ window.Screens = window.Screens || {};
         (d.findings || []).forEach(f => {
           const card = document.createElement('div');
           card.innerHTML = App.card(`${f.code} · ${esc(f.title)} (${f.count})`, `
-            ${App.alert(f.severity === 'critical' || f.severity === 'error' ? 'error' : 'warn', esc(f.detail))}
+            ${App.alert(f.severity === 'critical' || f.severity === 'error' ? 'error' : f.severity === 'warn' ? 'warn' : 'info', esc(f.detail))}
             ${App.kv({'Важность': sevTag(f.severity), 'Случаев': f.count,
                       'Что делать': esc(f.recommendation)})}
             <details class="acc"><summary>Основания (${Math.min(f.count, 10)} из ${f.count})</summary>
@@ -235,8 +238,8 @@ window.Screens = window.Screens || {};
           b.disabled = true; b.textContent = 'Проверка…';
           try {
             const res = await App.post('/api/v1/diagnostics/run', scope ? {research_id: scope} : {});
-            App.toast('Проверено правил: ' + res.rules + ', противоречий: ' + (res.findings || []).length,
-              (res.findings || []).length ? 'warn' : 'ok');
+            const rc = (res.findings || []).filter(f => f.severity !== 'info').length;
+            App.toast('Проверено правил: ' + res.rules + ', противоречий: ' + rc, rc ? 'warn' : 'ok');
             App.go('journal', {tab: 'contradictions', scope: params.scope});
           } catch (e) { App.toast(esc(e.message), 'error'); b.disabled = false; b.textContent = 'Проверить и записать в журнал'; }
         });

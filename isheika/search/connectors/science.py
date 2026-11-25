@@ -9,6 +9,7 @@ import re
 import xml.etree.ElementTree as ET
 
 from ...contracts import CoreError, Document
+from ..normalize import lang_code
 from .base import BaseConnector, register
 
 
@@ -362,8 +363,111 @@ class OpenAIRE(BaseConnector):
     code = "CON-OPENAIRE"
     evidence_class_default = "primary_peer_reviewed"
 
+    @staticmethod
+    def _oaf_list(v):
+        """Поле OAF приходит то объектом, то списком — приводим к списку."""
+        if v is None:
+            return []
+        return v if isinstance(v, list) else [v]
+
+    @classmethod
+    def _oaf_val(cls, v, default=""):
+        if isinstance(v, dict):
+            return v.get("$") or v.get("@classname") or default
+        if isinstance(v, list):
+            return cls._oaf_val(v[0], default) if v else default
+        return v if v is not None else default
+
+    def _search_oaf(self, expr: str, limit: int, research_id):
+        """Актуальный контур: /search/researchProducts?format=json (OAF JSON).
+
+        ИД-27: путь Graph API `graph/v1/researchProducts` отвечает
+        HTTP 405 «No static resource v1/researchProducts» на любой запрос
+        (проверено 25.11.2026 на трёх разных запросах) — источник был потерян.
+        """
+        # Источник принимает только латиницу и НЕ принимает логические операторы:
+        # кириллический `keywords` даёт HTTP 409 «Syntax errors. expected boolean»
+        # (проверено 25.11.2026), «6G OR IMT-2030» — тоже 409, а «6G IMT-2030» — 200.
+        # Поэтому выражение приводится к перечню термов через пробел; фразы в кавычках.
+        # отбор латинских термов идёт ДО ограничения «не более 4»: в смешанной
+        # ветви русские термы стоят первыми и вытесняли англоязычные полностью.
+        latin = [t for t in self.terms(expr) if not re.search(r"[а-яё]", t, re.I)][:4]
+        if not latin:
+            raise CoreError("E_POLICY", "OpenAIRE принимает запрос только на латинице "
+                                        "(кириллица даёт HTTP 409); используется англоязычная ветвь запроса")
+        # `keywords` объединяет термы по И: четыре узкие фразы дают пустой ответ
+        # (проверено 25.11.2026: 4 фразы — 0, 2 терма — 5). Ослабляем запрос до 2 и 1
+        # терма, пока не найдены материалы; число обращений ограничено тремя.
+        tried, out = [], []
+        for n in (4, 2, 1):
+            sel = latin[:n]
+            if not sel or sel in tried:
+                continue
+            tried.append(sel)
+            keywords = " ".join(f'"{t}"' if " " in t else t for t in sel)
+            url = "https://api.openaire.eu/search/researchProducts?" + self.qs(
+                {"keywords": keywords, "size": min(limit, 50), "format": "json"})
+            out = self._parse_oaf(self._oaf_get(url, research_id))
+            if out:
+                break
+        return out
+
+    def _oaf_get(self, url: str, research_id):
+        try:
+            return self.get_json(url, research_id=research_id)
+        except CoreError as e:
+            # HTTP 409 «Fail to execute search» у OpenAIRE бывает плавающим
+            # (внутренняя ошибка Solr): один повтор через паузу, затем честный отказ.
+            if e.error.code != "E_NETWORK" or "409" not in (e.error.message or ""):
+                raise
+            import time as _t
+            _t.sleep(1.5)
+            return self.get_json(url, research_id=research_id)
+
+    def _parse_oaf(self, data: dict) -> list:
+        """Разбор ответа OAF: поля приходят то объектом, то списком, значения в `$`."""
+        results = ((data.get("response") or {}).get("results") or {}).get("result")
+        out = []
+        for it in self._oaf_list(results):
+            md = ((it.get("metadata") or {}).get("oaf:entity") or {}).get("oaf:result") or {}
+            titles = self._oaf_list(md.get("title"))
+            title = next((t.get("$") for t in titles
+                          if isinstance(t, dict) and t.get("@classid") == "main title" and t.get("$")), None)
+            title = title or self._oaf_val(md.get("title"))
+            if not title:
+                continue
+            authors = [self._oaf_val(a) for a in self._oaf_list(md.get("creator"))]
+            pids = self._oaf_list(md.get("pid"))
+            doi = next((p.get("$") for p in pids
+                        if isinstance(p, dict) and p.get("@classid") == "doi" and (p.get("$") or "").startswith("10.")), None)
+            urls = [self._oaf_val(u) for u in self._oaf_list(md.get("url"))]
+            url_doc = next((u for u in urls if isinstance(u, str) and u.startswith("http")), None)
+            url_doc = url_doc or (f"https://doi.org/{doi}" if doi else None)
+            if not url_doc:
+                continue
+            lang = md.get("language") if isinstance(md.get("language"), dict) else {}
+            code = (lang.get("@classid") or "").lower()
+            out.append(self.doc(
+                title=str(title), url=url_doc,
+                external_id=self._oaf_val(md.get("originalId")) or doi,
+                abstract=_clean_html(self._oaf_val(md.get("description"))),
+                authors=[a for a in authors if a][:20],
+                published_at=self._oaf_val(md.get("dateofacceptance")) or None,
+                language=lang_code(code),
+                doc_type=(self._oaf_val(md.get("resourcetype")) or "article").lower(),
+                evidence_class="primary_peer_reviewed", doi=doi,
+                identifiers={"openaire": self._oaf_val(md.get("originalId")) or doi}, marker="П"))
+        return out
+
     def search(self, expression, *, limit=20, year_from=None, year_to=None, languages=None, research_id=None):
-        # OpenAIRE: не более 4 логических операторов в запросе
+        # Отбор термов (не более 4, только латиница, без операторов) делает _search_oaf:
+        # упрощение до первых четырёх термов вытесняло англоязычную часть смешанной ветви.
+        try:
+            return self._search_oaf(expression, limit, research_id)
+        except CoreError as e:
+            # Запасной путь — Graph API: если он снова заработает, источник не теряется.
+            if e.error.code not in ("E_NETWORK", "E_NOT_FOUND") or "405" not in (e.error.message or ""):
+                raise
         expr = self.simplify(expression, max_terms=4)
         data = self.get_json(self.base_url + "?" + self.qs(
             {"search": expr, "pageSize": min(limit, 50)}), research_id=research_id)
@@ -378,7 +482,7 @@ class OpenAIRE(BaseConnector):
                 title=titles if isinstance(titles, str) else str(titles), url=url or "",
                 external_id=r.get("id"), abstract=_clean_html(r.get("descriptions") if isinstance(r.get("descriptions"), str) else ""),
                 authors=[a for a in authors if a][:20],
-                published_at=r.get("publicationDate"), language=(r.get("language") or {}).get("code") if isinstance(r.get("language"), dict) else None,
+                published_at=r.get("publicationDate"), language=lang_code((r.get("language") or {}).get("code") if isinstance(r.get("language"), dict) else None),
                 doc_type=(r.get("type") or "article").lower(), evidence_class="primary_peer_reviewed",
                 doi=doi, identifiers={"openaire": r.get("id")}, marker="П"))
         return out
@@ -408,7 +512,7 @@ class Core(BaseConnector):
                 external_id=str(r.get("id")), abstract=r.get("abstract") or "",
                 authors=[a.get("name") for a in (r.get("authors") or []) if isinstance(a, dict)][:20],
                 published_at=r.get("publishedDate") or (str(r.get("yearPublished")) + "-01-01" if r.get("yearPublished") else None),
-                language=(r.get("language") or {}).get("code") if isinstance(r.get("language"), dict) else None,
+                language=lang_code((r.get("language") or {}).get("code") if isinstance(r.get("language"), dict) else None),
                 doc_type="article", evidence_class="primary_peer_reviewed", doi=r.get("doi"),
                 identifiers={"core": r.get("id"), "oai": r.get("oai")}, marker="П"))
         return out

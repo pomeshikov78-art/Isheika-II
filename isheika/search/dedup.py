@@ -244,6 +244,14 @@ def store(research_id: str, doc: Document, *, search_job_id: str | None = None,
     blob_id, sha = blob_of(doc)
     key, basis = logical_key(doc)
     existing, match_basis, conf = find_candidate(doc)
+    # ИД-25: вхождение проверяется ДО решения о статусе документа. Повторное
+    # обнаружение того же URL тем же исследованием — не новый дубль: иначе
+    # документ помечался дубликатом самого себя, и сводка этапа показывала
+    # «уникальных 0, дублей 15» для собственного корпуса исследования.
+    cu = norm.normalize_url(doc.url)
+    occ = db.one("""SELECT id FROM content_occurrences
+                    WHERE research_id=? AND source_code=? AND canonical_url=?""",
+                 (research_id, doc.source_code, cu))
     now = iso_now()
     relation = None
     cluster_id = None
@@ -285,9 +293,13 @@ def store(research_id: str, doc: Document, *, search_job_id: str | None = None,
         # даже при одинаковом извлечённом тексте: это разные логические документы.
         version_relation = relation in VERSION_RELATIONS
         if relation in ("EXACT_DUPLICATE", "ALTERNATIVE_HOSTING") or (same_blob and not version_relation):
-            dedup_status = "DUPLICATE"
-            db.update("content_documents", "id", doc_id,
-                      {"deduplication_status": "DUPLICATE", "updated_at": now})
+            if occ is None:
+                dedup_status = "DUPLICATE"
+                db.update("content_documents", "id", doc_id,
+                          {"deduplication_status": "DUPLICATE", "updated_at": now})
+            else:
+                # то же самое вхождение: прежний статус документа сохраняется
+                dedup_status = existing.get("deduplication_status") or "UNIQUE"
             cluster_id = db.one("SELECT cluster_id FROM content_documents WHERE id=?", (doc_id,))["cluster_id"]
             if relation == "ALTERNATIVE_HOSTING" and not cluster_id:
                 cluster_id = new_id("cls-")
@@ -325,10 +337,6 @@ def store(research_id: str, doc: Document, *, search_job_id: str | None = None,
             dedup_status = "CLUSTERED"
             is_new = _inserted
 
-    cu = norm.normalize_url(doc.url)
-    occ = db.one("""SELECT id FROM content_occurrences
-                    WHERE research_id=? AND source_code=? AND canonical_url=?""",
-                 (research_id, doc.source_code, cu))
     if occ:
         occ_id = occ["id"]
         db.update("content_occurrences", "id", occ_id,

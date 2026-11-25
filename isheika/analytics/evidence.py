@@ -183,7 +183,7 @@ def build_evidence(research_id: str, *, progress_cb=None) -> dict:
     indep = assign_independence(research_id)
     gindex = group_index(research_id)
     groups = Counter(d.get("independence_group") for d in docs.values())
-    created = 0
+    created = updated = 0
     statuses: Counter = Counter()
     for i, c in enumerate(claims, 1):
         doc_ids = _doc_ids_for_claim(c, docs, by_agent)
@@ -213,8 +213,8 @@ def build_evidence(research_id: str, *, progress_cb=None) -> dict:
                 status = "PARTIAL"
             else:
                 status = "PARTIAL"
-            db.insert("evidence_items", {
-                "id": new_id("evd-"), "claim_id": c["id"], "document_id": did,
+            fields = {
+                "claim_id": c["id"], "document_id": did,
                 "research_id": research_id, "source_code": d["source_code"], "url": d["url"],
                 "locator": locator, "quote": quote, "published_at": d["published_at"],
                 "accessed_at": d["accessed_at"], "evidence_class": eclass,
@@ -223,8 +223,19 @@ def build_evidence(research_id: str, *, progress_cb=None) -> dict:
                 "origin_class": origin, "primary_source_ref": d.get("url"),
                 "first_published_at": d.get("published_at"),
                 "verification_status": status, "quality": q, "status": status,
-                "marker": d["marker"], "archive_url": None, "created_at": iso_now()})
-            created += 1
+                "marker": d["marker"]}
+            # ИД-28: пара «утверждение — документ» уникальна. Повторный прогон
+            # пересчитывает доказательство, а не вставляет второе (живая проверка
+            # 1.5.2: 120 доказательств превращались в 240 при том же корпусе).
+            prev = db.one("SELECT id FROM evidence_items WHERE claim_id=? AND document_id=?",
+                          (c["id"], did))
+            if prev:
+                db.update("evidence_items", "id", prev["id"], fields)
+                updated += 1
+            else:
+                db.insert("evidence_items", {"id": new_id("evd-"), **fields,
+                                             "archive_url": None, "created_at": iso_now()})
+                created += 1
             qualities.append(q)
             if independent:
                 indep_groups.add(d["independence_group"])
@@ -244,10 +255,13 @@ def build_evidence(research_id: str, *, progress_cb=None) -> dict:
 
     _detect_contradictions(research_id)
     events.emit("evidence.added", research_id=research_id,
-                payload={"evidence_items": created, "claims": len(claims), "statuses": dict(statuses)})
-    return {"claims": len(claims), "evidence_items": created, "statuses": dict(statuses),
+                payload={"evidence_items": created + updated, "claims": len(claims),
+                         "created": created, "updated": updated, "statuses": dict(statuses)})
+    return {"claims": len(claims), "evidence_items": created + updated,
+            "created": created, "updated": updated, "statuses": dict(statuses),
             "independence_groups": indep["groups"], "reprints_detected": indep["reprints"],
-            "note": "Повторные публикации одного сообщения учтены как одна группа независимости (ИД-11)"}
+            "note": "Повторные публикации одного сообщения учтены как одна группа независимости (ИД-11); "
+                    "повторный прогон пересчитывает доказательства, а не удваивает их (ИД-24/ИД-28)"}
 
 
 def _doc_ids_for_claim(claim: dict, docs: dict, by_agent: dict) -> list[str]:
@@ -274,6 +288,47 @@ def _doc_ids_for_claim(claim: dict, docs: dict, by_agent: dict) -> list[str]:
     return [d for _, d in scored[:4]]
 
 
+def upsert_claim(research_id: str, *, text: str, ctype: str, section: str,
+                 produced_by: str, doc_ids: list[str] | None = None,
+                 link_from_kind: str = "claim") -> str:
+    """Идемпотентное утверждение (ИД-24, ред. 1.5.2).
+
+    Основание — журнал с машины пользователя: при каждом повторном прогоне
+    этап ИИ-задач вставлял НОВЫЕ утверждения, и их число росло 8 → 16 → 24 → 32 → 40
+    при нуле доказательств. Утверждение опознаётся естественным ключом
+    (исследование, раздел, текст): повтор обновляет запись, а не плодит дубли.
+    Статус проверки и связи не сбрасываются.
+    """
+    text = (text or "")[:2000]
+    row = db.one("""SELECT id FROM knowledge_claims
+                    WHERE research_id=? AND section=? AND claim_text=?""",
+                 (research_id, section, text))
+    if row:
+        cid = row["id"]
+        db.update("knowledge_claims", "id", cid, {"claim_type": ctype, "produced_by": produced_by})
+    else:
+        cid = new_id("clm-")
+        db.insert("knowledge_claims", {
+            "id": cid, "research_id": research_id, "technology_id": None,
+            "claim_text": text, "claim_type": ctype, "section": section,
+            "status": "UNVERIFIED", "confidence": None, "produced_by": produced_by,
+            "created_at": iso_now()})
+    for did in (doc_ids or [])[:5]:
+        from_id = cid if link_from_kind == "claim" else section
+        exists = db.one("""SELECT id FROM knowledge_links
+                           WHERE research_id=? AND from_kind=? AND from_id=?
+                             AND to_kind='document' AND to_id=? AND link_type='cited'""",
+                        (research_id, link_from_kind, from_id, did))
+        if exists:
+            continue
+        db.insert("knowledge_links", {
+            "id": new_id("lnk-"), "research_id": research_id,
+            "from_kind": link_from_kind, "from_id": from_id,
+            "to_kind": "document", "to_id": did, "link_type": "cited",
+            "confirmed": 1 if link_from_kind == "claim" else 0, "created_at": iso_now()})
+    return cid
+
+
 def _claims_from_documents(research_id: str, docs: dict) -> None:
     """Базовый слой утверждений без ИИ: только то, что есть в источниках."""
     for did, d in docs.items():
@@ -288,15 +343,8 @@ def _claims_from_documents(research_id: str, docs: dict) -> None:
         else:
             text = f'{d["title"]}'
             ctype = "FACT" if d["evidence_class"] in ("primary_peer_reviewed", "primary_report", "dataset", "official_register") else "ANALYSIS"
-        cid = new_id("clm-")
-        db.insert("knowledge_claims", {"id": cid, "research_id": research_id, "technology_id": None,
-                                       "claim_text": text[:2000], "claim_type": ctype,
-                                       "section": "DOC", "status": "UNVERIFIED", "confidence": None,
-                                       "produced_by": "document_layer", "created_at": iso_now()})
-        db.insert("knowledge_links", {"id": new_id("lnk-"), "research_id": research_id,
-                                      "from_kind": "claim", "from_id": cid, "to_kind": "document",
-                                      "to_id": did, "link_type": "cited", "confirmed": 1,
-                                      "created_at": iso_now()})
+        upsert_claim(research_id, text=text, ctype=ctype, section="DOC",
+                     produced_by="document_layer", doc_ids=[did])
 
 
 def _detect_contradictions(research_id: str) -> None:

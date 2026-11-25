@@ -31,6 +31,33 @@ EVIDENCE_BY_TYPE = {
     "proceedings-article": "primary_peer_reviewed",
 }
 
+# ИД-27: часть источников (OpenAIRE) отдаёт язык по ISO 639-2 («eng», «deu»),
+# а корпус и перевод работают с двухбуквенными кодами. Без приведения в корпусе
+# оказывались «eng» и «en» как разные языки, а перевод брал первые две буквы
+# («deu» → «de» верно, «ger» → «ge», «chi» → «ch» — неверно).
+ISO639_2_TO_1 = {
+    "eng": "en", "rus": "ru", "deu": "de", "ger": "de", "fra": "fr", "fre": "fr",
+    "spa": "es", "ita": "it", "por": "pt", "nld": "nl", "dut": "nl", "jpn": "ja",
+    "chi": "zh", "zho": "zh", "kor": "ko", "ara": "ar", "hin": "hi", "tur": "tr",
+    "pol": "pl", "ukr": "uk", "bel": "be", "kaz": "kk", "uzb": "uz", "aze": "az",
+    "hye": "hy", "arm": "hy", "kat": "ka", "geo": "ka", "ces": "cs", "cze": "cs",
+    "swe": "sv", "nor": "no", "dan": "da", "fin": "fi", "ell": "el", "gre": "el",
+    "heb": "he", "fas": "fa", "per": "fa", "tha": "th", "vie": "vi", "ind": "id",
+    "msa": "ms", "may": "ms", "hun": "hu", "ron": "ro", "rum": "ro", "bul": "bg",
+    "srp": "sr", "hrv": "hr", "slk": "sk", "slo": "sk", "slv": "sl", "lit": "lt",
+    "lav": "lv", "est": "et", "cat": "ca",
+}
+
+
+def lang_code(value: str | None) -> str | None:
+    """Двухбуквенный код языка либо None, если язык не определён."""
+    v = (value or "").strip().lower()
+    if not v or v in ("und", "unknown", "n/a", "null", "zxx", "mul"):
+        return None
+    if len(v) == 2:
+        return v
+    return ISO639_2_TO_1.get(v)
+
 
 def normalize_url(url: str) -> str:
     try:

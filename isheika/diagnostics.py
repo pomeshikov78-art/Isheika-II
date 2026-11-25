@@ -296,28 +296,88 @@ def rule_policy(research_id=None) -> list[dict]:
     return out
 
 
+def _version_window() -> tuple[str, str]:
+    """Граница окна «текущая версия»: (начало, версия).
+
+    ИД-26 (четвёртая выгрузка, 25.11.2026): журнал хранится 30 суток и переживает
+    обновления, а DIA-15/16 считали повторы за всё время хранения и сообщали
+    «повторяющийся дефект» по записям прежних версий, где дефект уже исправлен.
+    Клиентские события несут app_version — по самой ранней записи текущей версии
+    определяем начало окна. Если клиентских событий текущей версии ещё нет
+    (только серверная активность) — берём начало последней загрузки приложения.
+    """
+    from . import __version__
+    row = db.one("SELECT MIN(at) AS at FROM ops_journal WHERE client LIKE ?",
+                 ('%"app_version": "' + __version__ + '"%',))
+    if row and row.get("at"):
+        return row["at"], __version__
+    boot = db.one("SELECT boot_id FROM ops_boot_log ORDER BY rowid DESC LIMIT 1")
+    if boot:
+        row = db.one("SELECT MIN(at) AS at FROM ops_boot_log WHERE boot_id=?",
+                     (boot["boot_id"],))
+        if row and row.get("at"):
+            return row["at"], __version__
+    return "", __version__
+
+
 def rule_journal(research_id=None) -> list[dict]:
     """DIA-15…18. Дефекты по самому журналу: повторяемость, браузер, секреты, сбои записи."""
     out = []
-    groups = journal.errors(limit=20)["items"]
+    since, version = _version_window()
+    # ИД-26: действующие повторы считаем только в окне текущей версии.
+    groups = journal.errors(limit=20, since=since or None)["items"]
     repeated = [g for g in groups if g["occurrences"] >= 3]
     if repeated:
         out.append(_finding("DIA-15", "error", "Повторяющийся дефект (одна подпись ≥ 3 раз)",
-                            "Одинаковые падения с одной подписью — устойчивый баг, а не случайный сбой.",
+                            "Одинаковые падения с одной подписью — устойчивый баг, а не случайный сбой. "
+                            "Учтены записи текущей версии %s (с %s)." % (version, since or "начала журнала"),
                             len(repeated),
                             [{"fingerprint": g["fingerprint"], "action": g["action"],
                               "error_code": g["error_code"], "occurrences": g["occurrences"],
-                              "last_seen": g["last_seen"],
+                              "last_seen": g["last_seen"], "version": version,
                               "sample_id": (g.get("sample") or {}).get("id")} for g in repeated],
                             "Открыть ошибку по подписи в UI-32 → «Ошибки», разобрать traceback и закрыть дефект."))
+    else:
+        old = [g for g in journal.errors(limit=20)["items"]
+               if g["occurrences"] >= 3 and (g.get("last_seen") or "") < since]
+        if old:
+            out.append(_finding(
+                "DIA-15", "info", "Повторяющиеся ошибки прежних версий (историческая запись)",
+                "В версии %s повторов нет. В журнале остались %d групп повторов из более ранних "
+                "версий (последняя запись %s): журнал хранится %d суток и переживает обновления."
+                % (version, len(old), old[0]["last_seen"], SETTINGS.journal_retention_days),
+                len(old),
+                [{"fingerprint": g["fingerprint"], "action": g["action"],
+                  "error_code": g["error_code"], "occurrences": g["occurrences"],
+                  "last_seen": g["last_seen"], "current_version": version} for g in old],
+                "Действий не требуется: записи относятся к исправленным версиям и уйдут по "
+                "истечении срока хранения. При разборе дефектов смотреть окно текущей версии."))
     browser = db.query("""SELECT fingerprint, action, COUNT(*) AS occurrences, MAX(at) AS last_seen
                           FROM ops_journal WHERE source='browser' AND level IN ('error','critical')
-                          GROUP BY fingerprint HAVING COUNT(*) >= 2 ORDER BY occurrences DESC LIMIT 20""")
+                            AND at>=?
+                          GROUP BY fingerprint HAVING COUNT(*) >= 2 ORDER BY occurrences DESC LIMIT 20""",
+                       (since or "",))
     if browser:
         out.append(_finding("DIA-16", "warn", "Повторяющиеся ошибки интерфейса",
-                            "Ошибки браузера доходят до сервера и группируются: дефект виден без доступа к машине пользователя.",
+                            "Ошибки браузера доходят до сервера и группируются: дефект виден без доступа "
+                            "к машине пользователя. Учтены записи текущей версии %s (с %s)."
+                            % (version, since or "начала журнала"),
                             len(browser), [dict(r) for r in browser],
                             "Открыть UI-32 → «Браузер», сопоставить с версией интерфейса и экраном."))
+    else:
+        old_browser = db.query(
+            """SELECT fingerprint, action, COUNT(*) AS occurrences, MAX(at) AS last_seen
+               FROM ops_journal WHERE source='browser' AND level IN ('error','critical') AND at<?
+               GROUP BY fingerprint HAVING COUNT(*) >= 2 ORDER BY occurrences DESC LIMIT 20""",
+            (since or "",)) if since else []
+        if old_browser:
+            out.append(_finding(
+                "DIA-16", "info", "Ошибки интерфейса прежних версий (историческая запись)",
+                "В версии %s повторов интерфейса нет; %d групп остались от прежних версий "
+                "(последняя запись %s)." % (version, len(old_browser), old_browser[0]["last_seen"]),
+                len(old_browser),
+                [{**dict(r), "current_version": version} for r in old_browser],
+                "Действий не требуется: записи относятся к прежним версиям интерфейса."))
     leaks = db.query("""SELECT id, at, action, message FROM ops_journal
                         WHERE message LIKE '%Bearer %' OR detail LIKE '%"password"%'
                            OR detail LIKE '%"api_key"%' OR message LIKE '%api_key=%' LIMIT 20""")
@@ -430,19 +490,24 @@ def run(*, research_id: str | None = None, to_journal: bool = False, actor: str 
     findings.sort(key=lambda f: (SEVERITY_ORDER.get(f["severity"], 9), -f["count"], f["code"]))
     counts = {sev: sum(1 for f in findings if f["severity"] == sev)
               for sev in ("critical", "error", "warn", "info")}
+    # ИД-26: справки (info) — не противоречия, а пояснения к историческим записям.
+    real = [f for f in findings if f["severity"] != "info"]
     result = {"checked_at": iso_now(), "rules": len(RULES), "scope": research_id or "вся система",
               "findings": findings, "counts": counts, "broken_rules": broken,
-              "cases": sum(f["count"] for f in findings),
-              "ok": not findings and not broken,
+              "cases": sum(f["count"] for f in real),
+              "informational": len(findings) - len(real),
+              "ok": not real and not broken,
               "note": "Правила только читают данные; противоречие — это расхождение с ТЗ, а не мнение модели"}
     if to_journal:
         for f in findings:
-            journal.record("error" if f["severity"] in ("critical", "error") else "warn",
+            level = ("error" if f["severity"] in ("critical", "error")
+                     else "warn" if f["severity"] == "warn" else "info")
+            journal.record(level,
                            "analytics", f"diagnostics.{f['code']}", message=f["title"],
                            actor=actor, outcome="contradiction", research_id=f.get("research_id"),
                            detail={"count": f["count"], "evidence": f["evidence"],
                                    "recommendation": f["recommendation"]})
         journal.record("info", "analytics", "diagnostics.run", actor=actor,
-                       message=f"Правил: {len(RULES)}, противоречий: {len(findings)}, случаев: {result['cases']}",
+                       message=f"Правил: {len(RULES)}, противоречий: {len(real)}, случаев: {result['cases']}",
                        detail={"counts": counts, "scope": result["scope"]})
     return result

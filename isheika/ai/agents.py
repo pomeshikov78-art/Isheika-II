@@ -97,16 +97,10 @@ def _claims_from_agent(research_id: str, agent_code: str, res: dict) -> None:
             ctype = "HYPOTHESIS"       # факт без источника не допускается
         if res.get("simulated") and ctype == "FACT":
             ctype = "ANALYSIS"         # имитационный ответ не порождает FACT
-        db.insert("knowledge_claims", {
-            "id": new_id("clm-"), "research_id": research_id, "technology_id": None,
-            "claim_text": text[:2000], "claim_type": ctype, "section": agent_code,
-            "status": "UNVERIFIED", "confidence": None, "produced_by": producer,
-            "created_at": iso_now()})
-        for did in doc_ids[:5]:
-            db.insert("knowledge_links", {"id": new_id("lnk-"), "research_id": research_id,
-                                          "from_kind": "agent", "from_id": agent_code,
-                                          "to_kind": "document", "to_id": did,
-                                          "link_type": "cited", "confirmed": 0, "created_at": iso_now()})
+        # ИД-24: повторный прогон обновляет утверждение, а не создаёт второе.
+        from ..analytics.evidence import upsert_claim
+        upsert_claim(research_id, text=text, ctype=ctype, section=agent_code,
+                     produced_by=producer, doc_ids=doc_ids, link_from_kind="agent")
     events.emit("evidence.added", research_id=research_id,
                 payload={"agent": agent_code, "claims": len(items)})
 

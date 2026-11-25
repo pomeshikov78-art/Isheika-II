@@ -263,10 +263,10 @@
   },
   {
    "code": "CON-OPENAIRE",
-   "name": "OpenAIRE Graph API (JSON)",
+   "name": "OpenAIRE Search API (JSON)",
    "source_name": "OpenAIRE",
    "protocol": "REST",
-   "base_url": "https://api.openaire.eu/graph/v1/researchProducts",
+   "base_url": "https://api.openaire.eu/search/researchProducts",
    "auth_type": "none",
    "requires_key": false,
    "paid": false,
@@ -278,7 +278,7 @@
    },
    "limits": {
     "rps": 2,
-    "note": "XML Search API отключён 31.05.2026 — только Graph API"
+    "note": "Проверено 25.11.2026: graph/v1/researchProducts отвечает HTTP 405 «No static resource» на любой запрос; рабочий контур — /search/researchProducts?format=json (OAF JSON). Graph API оставлен запасным путём."
    },
    "quota_policy": {
     "window": "second"
@@ -286,7 +286,7 @@
    "verified_marker": "П",
    "priority": "P1",
    "robots_policy": "api_terms",
-   "api_terms_url": "https://graph.openaire.eu/docs/apis/"
+   "api_terms_url": "https://www.openaire.eu/openaire-apis"
   },
   {
    "code": "CON-STACKEXCHANGE",
