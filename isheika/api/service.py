@@ -461,12 +461,19 @@ def document_clusters(rid: str) -> list[dict]:
 
 
 def document_relations(rid: str) -> list[dict]:
+    # ИД-33: одна связь на пару документов и тип (последняя запись пары).
     return db.query("""SELECT r.*, d1.title AS from_title, d2.title AS to_title
                        FROM content_relations r
                        JOIN content_documents d1 ON d1.id=r.from_document_id
                        JOIN content_documents d2 ON d2.id=r.to_document_id
                        JOIN content_occurrences o ON o.document_id=r.from_document_id
-                       WHERE o.research_id=? GROUP BY r.id ORDER BY r.created_at DESC LIMIT 500""", (rid,))
+                       WHERE o.research_id=?
+                         AND r.id=(SELECT s2.id FROM content_relations s2
+                                   WHERE s2.from_document_id=r.from_document_id
+                                     AND s2.to_document_id=r.to_document_id
+                                     AND s2.relation_type=r.relation_type
+                                   ORDER BY s2.created_at DESC, s2.rowid DESC LIMIT 1)
+                       GROUP BY r.id ORDER BY r.created_at DESC LIMIT 500""", (rid,))
 
 
 def document_graph(rid: str, types: list[str] | None = None, limit: int = 300) -> dict:
@@ -481,6 +488,9 @@ def document_graph(rid: str, types: list[str] | None = None, limit: int = 300) -
                                WHERE o.document_id=d.id AND o.research_id=?) AS occurrences
                        FROM research_documents d
                        LEFT JOIN search_results r ON r.document_id=d.id AND r.research_id=d.research_id
+                            AND r.id=(SELECT s2.id FROM search_results s2 WHERE s2.document_id=d.id
+                                      AND s2.research_id=d.research_id
+                                      ORDER BY s2.created_at DESC, s2.rowid DESC LIMIT 1)
                        WHERE d.research_id=? GROUP BY d.id
                        ORDER BY r.relevance_score DESC, d.created_at LIMIT ?""", (rid, rid, limit))
     ids = {d["id"] for d in docs}
@@ -579,7 +589,11 @@ def confirm_cluster(rid: str, body: dict, *, actor: str = "system") -> dict:
 
 
 def search_results(rid: str, *, cls: str | None = None, limit: int = 100, offset: int = 0) -> dict:
-    sql = "SELECT * FROM search_results WHERE research_id=?"
+    # ИД-32: одна запись на документ — последняя оценка пары «исследование × документ».
+    # Записи, оставленные повторными прогонами прежних версий, не двоят список.
+    sql = ("SELECT * FROM search_results r WHERE r.research_id=?"
+           " AND r.id=(SELECT s2.id FROM search_results s2 WHERE s2.document_id=r.document_id"
+           " AND s2.research_id=r.research_id ORDER BY s2.created_at DESC, s2.rowid DESC LIMIT 1)")
     params: list = [rid]
     if cls:
         sql += " AND relevance_class=?"

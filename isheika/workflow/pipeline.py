@@ -17,6 +17,7 @@ from ..analytics import snapshot as SNAP
 from ..ai import agents as A, collective as C
 from ..reports import builder as RB
 from ..search import expansion as EX, manager as SM, query_parser as QP
+from .. import journal
 from .. import translation as TR
 from ..workflow import engine as W
 from ..workflow import events
@@ -141,9 +142,19 @@ def stage_search_model(job: dict, ctx: dict) -> dict:
                "exclusions": ex.exclusions})
     ctx["expansion"] = ex
     ctx["parsed_query"] = q
-    W.progress(job["id"], 1, 1, "Поисковая модель построена")
+    note = "Поисковая модель построена"
+    if ex.warnings:
+        note += "; предупреждений: %d" % len(ex.warnings)
+    W.progress(job["id"], 1, 1, note)
+    # ИД-31: нераспознанная тема/нераскрытое сокращение видны сразу, а не
+    # догадываются по пустой выдаче (запрос «бшпд» в журнале пользователя).
+    for w in ex.warnings:
+        journal.record("warn", "search", "search_model.warning", w,
+                       research_id=r["id"], job_id=job["id"], outcome="warn",
+                       detail={"core_terms": ex.core_terms[:8], "branches": len(ex.branches)})
     return {"branches": len(ex.branches), "core_terms": ex.core_terms[:8],
-            "exclusions": ex.exclusions, "expression": EX.primary_expression(ex, q)}
+            "exclusions": ex.exclusions, "expression": EX.primary_expression(ex, q),
+            "warnings": ex.warnings}
 
 
 @W.stage_handler("source_search")

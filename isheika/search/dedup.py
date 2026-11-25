@@ -226,10 +226,24 @@ def _ensure_cluster(doc_id: str, other_id: str, relation: str, confidence: float
         "confidence": confidence, "decided_by": decided_by, "created_at": iso_now()},
         key=("cluster_id", "document_id"))
     db.update("content_documents", "id", doc_id, {"cluster_id": cid, "updated_at": iso_now()})
-    db.insert("content_relations", {
-        "id": new_id("rel-"), "from_document_id": doc_id, "to_document_id": other_id,
-        "relation_type": relation, "confidence": confidence, "basis": basis,
-        "decided_by": decided_by, "created_at": iso_now()})
+    # ИД-33: связь — сущность пары документов и типа. Повторное обнаружение
+    # обновляет её, а не добавляет вторую (иначе граф и сводка связей росли
+    # с каждым прогоном). Решение аналитика не понижается до алгоритма.
+    prev = db.one("""SELECT id, decided_by, basis FROM content_relations
+                     WHERE from_document_id=? AND to_document_id=? AND relation_type=?
+                     ORDER BY created_at DESC, rowid DESC LIMIT 1""",
+                  (doc_id, other_id, relation))
+    if prev:
+        keep_manual = prev["decided_by"] not in ("algorithm", "", None)
+        db.update("content_relations", "id", prev["id"], {
+            "confidence": max(confidence, 1.0) if keep_manual else confidence,
+            "basis": prev["basis"] if keep_manual else basis,
+            "decided_by": prev["decided_by"] if keep_manual else decided_by})
+    else:
+        db.insert("content_relations", {
+            "id": new_id("rel-"), "from_document_id": doc_id, "to_document_id": other_id,
+            "relation_type": relation, "confidence": confidence, "basis": basis,
+            "decided_by": decided_by, "created_at": iso_now()})
     return cid
 
 
@@ -391,9 +405,13 @@ def summary(research_id: str) -> dict:
     occ = db.count("content_occurrences", "research_id=?", (research_id,))
     clusters = db.one("""SELECT COUNT(DISTINCT d.cluster_id) AS n FROM research_documents d
                          WHERE d.research_id=? AND d.cluster_id IS NOT NULL""", (research_id,))
-    rel = db.query("""SELECT relation_type, COUNT(*) AS n FROM content_relations r
-                      JOIN content_occurrences o ON o.document_id=r.from_document_id
-                      WHERE o.research_id=? GROUP BY relation_type""", (research_id,))
+    # ИД-33: связи считаются по парам документов, а не по строкам: записи,
+    # оставленные повторными прогонами прежних версий, не удваивают сводку.
+    rel = db.query("""SELECT relation_type, COUNT(*) AS n FROM (
+                          SELECT DISTINCT r.from_document_id, r.to_document_id, r.relation_type
+                          FROM content_relations r
+                          JOIN content_occurrences o ON o.document_id=r.from_document_id
+                          WHERE o.research_id=?) GROUP BY relation_type""", (research_id,))
     return {"logical_documents": docs, "occurrences": occ,
             "merged": max(0, occ - docs), "clusters": (clusters or {}).get("n", 0),
             "relations": {r["relation_type"]: r["n"] for r in rel}}

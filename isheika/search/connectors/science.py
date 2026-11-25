@@ -140,9 +140,11 @@ class Arxiv(BaseConnector):
     doc_type_default = "preprint"
 
     def search(self, expression, *, limit=20, year_from=None, year_to=None, languages=None, research_id=None):
-        terms = re.findall(r'"([^"]+)"|(\S+)', expression)
-        parts = [a or b for a, b in terms if (a or b) and a not in ("OR", "AND") and b not in ("OR", "AND")]
-        parts = [p for p in parts if p not in ("OR", "AND", "(", ")")][:6]
+        # ИД-30: собственный разбор «\S+» захватывал скобки вместе со словом:
+        # выражение ("технологии цифровых двойников системах") превращалось в
+        # all:"("технологии" OR all:"цифровых" … — невалидный запрос arXiv.
+        # Общий токенизатор коннектора выделяет фразы в кавычках и слова без скобок.
+        parts = self.terms(expression)[:6]
         query = " OR ".join(f'all:"{p}"' for p in parts) or f"all:{expression}"
         url = self.base_url + "?" + self.qs({"search_query": query, "start": 0,
                                              "max_results": min(limit, 50),

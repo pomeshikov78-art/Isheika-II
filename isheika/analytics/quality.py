@@ -19,9 +19,13 @@ def compute(research_id: str) -> dict:
     out: dict = {"methodology_version": m["version"], "calibration_status": "калибровка не завершена"}
 
     # --- поиск: метрики требуют разметки
-    labels = db.query("""SELECT r.score, r.class, d.id FROM search_results r
-                         JOIN research_documents d ON d.id=r.document_id
-                         WHERE r.research_id=? ORDER BY r.score DESC""", (research_id,))
+    # ИД-32: считаем по документам (последняя оценка пары «исследование × документ»),
+    # а не по строкам search_results: записи, оставленные прежними версиями,
+    # не должны удваивать выборку и распределение классов.
+    labels = db.query("""SELECT d.relevance_score AS score, d.relevance_class AS class, d.id
+                         FROM research_documents d
+                         WHERE d.research_id=? AND d.relevance_class IS NOT NULL
+                         ORDER BY d.relevance_score DESC""", (research_id,))
     marked = [db.dec(r, "details") for r in
               db.query("SELECT details FROM analytics_quality WHERE research_id=? AND metric='relevance_label'",
                        (research_id,))]

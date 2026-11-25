@@ -217,12 +217,13 @@ def assess_documents(research_id: str, q: ParsedQuery, ex: Expansion, profile: d
         docs.append(d)
     df, n = build_df(docs)
     counts = {"DIRECT": 0, "ADJACENT": 0, "BELOW_THRESHOLD": 0}
+    created = updated = 0
     search_task = db.one("SELECT id FROM search_jobs WHERE research_id=? ORDER BY created_at LIMIT 1", (research_id,))
     for i, d in enumerate(docs, 1):
         res = assess(d, q, ex, required_types=profile.get("doc_types") or q.doc_types,
                      corpus_df=df, corpus_n=n)
-        db.insert("search_results", {
-            "id": new_id("rel-"), "document_id": d.document_id, "research_id": research_id,
+        row = {
+            "document_id": d.document_id, "research_id": research_id,
             "search_task_id": (search_task or {}).get("id"),
             "relevance_score": res.score, "relevance_class": res.cls, "decision": res.decision,
             "score_s": res.components["S"], "score_t": res.components["T"], "score_c": res.components["C"],
@@ -233,12 +234,28 @@ def assess_documents(research_id: str, q: ParsedQuery, ex: Expansion, profile: d
             "input_hash": hashlib.sha256(json.dumps(
                 {"doc": d.document_id, "q": q.raw, "m": res.methodology_id},
                 sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:32],
-            "created_at": iso_now()})
+            "created_at": iso_now()}
+        # ИД-32: оценка — сущность пары «исследование × документ». Повторный прогон
+        # пересчитывает её, а не добавляет вторую запись (иначе распределение классов
+        # и список результатов удваивались). Решение аналитика не сбрасывается.
+        prev = db.one("""SELECT id, decision, reason FROM search_results
+                         WHERE research_id=? AND document_id=?
+                         ORDER BY created_at DESC, rowid DESC LIMIT 1""",
+                      (research_id, d.document_id))
+        if prev:
+            if prev["decision"] in ("MANUAL_INCLUDE", "MANUAL_EXCLUDE"):
+                row["decision"] = prev["decision"]
+                row["reason"] = prev["reason"] or res.reason
+            db.update("search_results", "id", prev["id"], row)
+            updated += 1
+        else:
+            db.insert("search_results", {"id": new_id("rel-"), **row})
+            created += 1
         counts[res.cls] += 1
         if progress_cb and i % 10 == 0:
             progress_cb(i, len(docs), f"Оценено документов: {i}/{len(docs)}")
     events.emit("document.assessed", research_id=research_id, payload=counts)
-    return {"assessed": len(docs), **counts}
+    return {"assessed": len(docs), **counts, "created": created, "updated": updated}
 
 
 def coverage_by_country(research_id: str) -> list[dict]:

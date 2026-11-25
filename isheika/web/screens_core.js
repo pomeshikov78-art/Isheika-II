@@ -315,7 +315,9 @@ window.Screens = window.Screens || {};
   function previewHTML(p) {
     const ex = p.expansion || {}, parsed = p.parsed || {};
     const list = a => (a || []).map(x => esc(typeof x === 'string' ? x : JSON.stringify(x))).join(', ') || '—';
+    const warns = ex.warnings || [];
     return App.card('Предпросмотр поисковой модели (UI-03)', `
+      ${warns.map(w => App.alert('warn', esc(w))).join('')}
       ${App.kv({'Сущности': list(parsed.entities), 'Назначение': list(parsed.purpose),
         'Термины объекта': list(parsed.object_terms), 'Ограничения': list(parsed.constraints),
         'Типы документов': list(parsed.doc_types), 'Период': esc((parsed.period_from || '—') + ' … ' + (parsed.period_to || '—')),

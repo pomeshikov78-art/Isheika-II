@@ -63,6 +63,10 @@ THESAURUS: dict[str, dict[str, list[str]]] = {
                      "en": ["free-space optical communication", "laser communication"], "abbr": ["FSO"]},
     "ai_accelerator": {"ru": ["ускоритель нейросетей", "нейропроцессор", "вычислитель ИИ"],
                        "en": ["AI accelerator", "neural processing unit", "inference accelerator"], "abbr": ["NPU", "TPU"]},
+    "digital_twin": {"ru": ["цифровой двойник", "цифровые двойники", "цифровая модель объекта",
+                            "виртуальный прототип"],
+                     "en": ["digital twin", "digital twins", "digital shadow", "virtual prototype"],
+                     "abbr": ["DT"]},
 }
 
 CONTEXT_TERMS = {
@@ -105,7 +109,8 @@ class Expansion:
     translations: list[str] = field(default_factory=list)
     branches: list[Branch] = field(default_factory=list)
     exclusions: list[str] = field(default_factory=list)
-    version: str = "EX-1.0.0"
+    warnings: list[str] = field(default_factory=list)
+    version: str = "EX-1.1.0"
     source: str = "deterministic_thesaurus"
 
     def to_dict(self) -> dict:
@@ -118,6 +123,80 @@ def _quote(term: str) -> str:
     return f'"{term}"' if " " in term else term
 
 
+# ---------------------------------------------------------------- обратный глоссарий
+def _stem_ru(word: str) -> str:
+    """Грубая основа русского слова: «цифровых»/«цифровой» → «цифров».
+
+    Морфологического анализатора в ядре нет (только стандартная библиотека),
+    поэтому сопоставление идёт по усечённому префиксу — этого достаточно,
+    чтобы найти термин глоссария в словоформе запроса.
+    """
+    w = word.lower().replace("ё", "е")
+    return w[:6] if len(w) > 6 else w[:4]
+
+
+_REVERSE: dict | None = None
+
+
+def _reverse_glossary() -> dict:
+    """Обратный словарь RU→EN из глоссария технического перевода (G-1.7.0).
+
+    ИД-29: если тема не распознана словарём сущностей, англоязычная ветвь
+    раньше не строилась вовсе — зарубежные источники получали кириллическую
+    фразу и не давали материалов. Глоссарий уже содержит пары EN→RU, поэтому
+    перевод терма берётся из него детерминированно, без обращения к ИИ.
+    """
+    global _REVERSE
+    if _REVERSE is not None:
+        return _REVERSE
+    from ..translation import glossary
+    g = glossary()
+    phrases: dict[str, str] = {}
+    words: dict[str, str] = {}
+    stems: dict[str, str] = {}
+    for en, ru in sorted(g.get("phrases", {}).items()):
+        key = " ".join(str(ru).lower().split())
+        phrases.setdefault(key, en)
+    for en, ru in sorted(g.get("words", {}).items()):
+        key = str(ru).lower().strip()
+        if not key or " " in key:
+            continue
+        words.setdefault(key, en)
+        stems.setdefault(_stem_ru(key), en)
+    _REVERSE = {"phrases": phrases, "words": words, "stems": stems,
+                "version": g.get("version", "G-0.0.0")}
+    return _REVERSE
+
+
+def _en_from_glossary(text: str, tokens: list[str]) -> tuple[list[str], list[str]]:
+    """Возвращает (фразы EN, отдельные слова EN) для русского запроса."""
+    rev = _reverse_glossary()
+    low = " ".join((text or "").lower().split()).replace("ё", "е")
+    phrases: list[str] = []
+    for ru, en in sorted(rev["phrases"].items(), key=lambda kv: -len(kv[0])):
+        stem_phrase = " ".join(_stem_ru(w) for w in ru.split())
+        hay = " ".join(_stem_ru(w) for w in low.split())
+        if ru in low or (len(ru.split()) > 1 and stem_phrase in hay):
+            if en not in phrases:
+                phrases.append(en)
+    words: list[str] = []
+    for t in tokens:
+        en = rev["words"].get(t.lower()) or rev["stems"].get(_stem_ru(t))
+        if en and en not in words and not any(en in p for p in phrases):
+            words.append(en)
+    return phrases[:4], words[:4]
+
+
+def _bigrams(tokens: list[str]) -> list[str]:
+    """Соседние пары значимых слов: «цифровых двойников», «системах связи».
+
+    Одна склеенная фраза из четырёх слов («технологии цифровых двойников
+    системах») не встречается в текстах дословно и давала почти нулевую
+    полноту (ИД-29: 13 документов, 1 прямой против 81/39 у короткого запроса).
+    """
+    return [f"{a} {b}" for a, b in zip(tokens, tokens[1:])]
+
+
 def build(q: ParsedQuery, *, languages: list[str] | None = None,
           ai_suggestions: list[str] | None = None) -> Expansion:
     langs = languages or ["ru", "en"]
@@ -125,6 +204,8 @@ def build(q: ParsedQuery, *, languages: list[str] | None = None,
     core_ru: list[str] = []
     core_en: list[str] = []
     abbr: list[str] = []
+    en_join = " OR "
+    en_rationale = "Перевод технической сущности; тема сохраняется"
 
     for ent in q.entities:
         entry = THESAURUS.get(ent, {})
@@ -133,12 +214,48 @@ def build(q: ParsedQuery, *, languages: list[str] | None = None,
         abbr += entry.get("abbr", [])
 
     if not core_ru and not core_en:
-        # нет распознанной сущности — работаем с исходными терминами
-        base = " ".join(q.object_terms[:4]) or q.raw
+        # Тема не распознана словарём сущностей (ИД-29). Раньше здесь склеивались
+        # четыре слова в одну точную фразу на языке запроса: «технологии цифровых
+        # двойников системах» — без англоязычной ветви и без синонимов. Теперь:
+        # пары соседних слов + перевод по глоссарию для второй языковой ветви.
+        tokens = q.object_terms[:5]
+        pairs = _bigrams(tokens)[:3]
+        base = pairs or [" ".join(tokens[:4]) or q.raw]
+        if len(tokens) <= 2:
+            # короткая тема: пары совпадают с самой фразой — добавляем и слова
+            base = list(dict.fromkeys(base + tokens))
         if q.language == "ru":
-            core_ru = [base]
+            core_ru = list(dict.fromkeys(base))
+            en_phrases, en_words = _en_from_glossary(q.raw, tokens)
+            core_en = en_phrases
+            if not core_en and en_words:
+                # отдельных слов достаточно только совместно: все понятия сразу
+                core_en = en_words
+                en_join = " AND "
+                en_rationale = ("Перевод отдельных слов по глоссарию %s; понятия соединены по И, "
+                                "чтобы не терять тему" % _reverse_glossary()["version"])
+                ex.warnings.append(
+                    "Тема не распознана словарём сущностей: англоязычная ветвь построена "
+                    "по глоссарию %s из отдельных слов (соединены по И). Уточните формулировку "
+                    "или добавьте термин в тезаурус." % _reverse_glossary()["version"])
+            elif core_en:
+                en_rationale = "Перевод темы по глоссарию %s (сущность не распознана)" % _reverse_glossary()["version"]
+                ex.warnings.append(
+                    "Тема не распознана словарём сущностей: ветви построены по исходным словам "
+                    "и глоссарию %s. Проверьте предпросмотр перед запуском." % _reverse_glossary()["version"])
+            else:
+                ex.warnings.append(
+                    "Тема не распознана словарём сущностей, перевода в глоссарии нет: "
+                    "англоязычная ветвь не построена — зарубежные источники материалов не дадут.")
         else:
-            core_en = [base]
+            core_en = list(dict.fromkeys(base))
+            ex.warnings.append(
+                "Тема не распознана словарём сущностей: поиск идёт по исходным словам. "
+                "Проверьте предпросмотр выражений перед запуском.")
+        if len(tokens) == 1 and len(tokens[0]) <= 6 and not core_en:
+            ex.warnings.append(
+                "Сокращение «%s» не раскрыто: синонимов и перевода нет. Раскройте его словами — "
+                "иначе поиск найдёт только дословные упоминания." % tokens[0])
 
     ex.core_terms = list(dict.fromkeys(core_ru + core_en))
     ex.abbreviations = list(dict.fromkeys(abbr))
@@ -166,8 +283,8 @@ def build(q: ParsedQuery, *, languages: list[str] | None = None,
         terms = core_en[:4]
         ex.branches.append(Branch(
             name="Core (EN)", kind="core", terms=terms,
-            expression=" OR ".join(_quote(t) for t in terms),
-            rationale="Перевод технической сущности; тема сохраняется"))
+            expression=en_join.join(_quote(t) for t in terms),
+            rationale=en_rationale))
     # --- ветвь 3: аббревиатуры (только вместе с ядром)
     if abbr:
         ex.branches.append(Branch(

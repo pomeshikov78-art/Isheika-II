@@ -379,6 +379,32 @@ t('отрисовка: лента мониторинга на месте', () =>
 App.setTheme('dark');
 t('тёмная тема применяется', () => window.document.documentElement.dataset.theme === 'dark');
 App.setTheme('light');
+
+// --- ред. 1.5.3: многословная тема и предупреждения предпросмотра (ИД-29, ИД-31)
+App.go('new', {});
+await sleep(1200);
+const previewOf = async (text) => {
+  window.document.getElementById('f-query').value = text;
+  window.document.getElementById('btn-preview').click();
+  for (let waited = 0; waited < 12000; waited += 200) {
+    await sleep(200);
+    const box = window.document.getElementById('preview-box');
+    if (box && !box.innerHTML.includes('spinner') && box.innerHTML.length > 200) return box.innerHTML;
+  }
+  return window.document.getElementById('preview-box')?.innerHTML || '';
+};
+const dtHtml = await previewOf('технологии цифровых двойников в системах связи');
+t('предпросмотр: многословная тема даёт ветви RU и EN', () => {
+  const en = /digital twin/i.test(dtHtml), ru = /цифров/i.test(dtHtml);
+  return (en && ru) ? true : `RU=${ru}, EN=${en}`;
+});
+t('предпросмотр: тема не склеена в одну фразу', () =>
+  dtHtml.includes('технологии цифровых двойников системах') ? 'склеенная фраза осталась' : true);
+const abbrHtml = await previewOf('бшпд');
+t('предпросмотр: нераскрытое сокращение предупреждает', () =>
+  /не раскрыто/.test(abbrHtml) ? true : 'предупреждения о сокращении нет');
+t('предпросмотр: отсутствие EN-ветви объяснено', () =>
+  /англоязычная ветвь не построена/.test(abbrHtml) ? true : 'пояснения об EN-ветви нет');
 console.log(extra.map(([ok, n, note]) => `${ok ? 'OK  ' : 'FAIL'} ${n.padEnd(40)} ${note}`).join('\n'));
 
 const total = routes.length + extra.length;

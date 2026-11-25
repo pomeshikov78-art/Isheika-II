@@ -41,8 +41,8 @@ class StackExchange(BaseConnector):
     SITES = ["electronics", "engineering", "physics", "stackoverflow", "robotics", "space"]
 
     def search(self, expression, *, limit=20, year_from=None, year_to=None, languages=None, research_id=None):
-        terms = [t for t in re.findall(r'"([^"]+)"|(\w+)', expression)]
-        words = " ".join((a or b) for a, b in terms if (a or b))[:120]
+        # ИД-30: операторы OR/AND попадали в текст запроса как обычные слова.
+        words = " ".join(self.terms(expression))[:120]
         out: list[Document] = []
         for site in self.SITES[:3]:
             params = {"order": "desc", "sort": "relevance", "q": words, "site": site,
